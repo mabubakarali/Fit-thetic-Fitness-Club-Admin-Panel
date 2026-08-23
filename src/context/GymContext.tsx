@@ -655,25 +655,25 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // 3. Tombstone payments (Cascade delete revenue from deleted member)
     const memberPayments = payments.filter((p) => p.member_id === id);
+    const memberPaymentIds = new Set(memberPayments.map((p) => p.id));
     for (const pay of memberPayments) {
       const payTombstone: Payment = {
         ...pay,
         deleted_at: nowIso,
         deleted_by: deviceId,
-        updated_at: nowIso,
+        updated_by: deviceId,
       };
       await putInStore('payments', payTombstone);
       await enqueueSync('payments', pay.id, 'DELETE', payTombstone);
     }
 
     // 4. Tombstone receipts
-    const memberReceipts = receipts.filter((r) => r.member_id === id);
+    const memberReceipts = receipts.filter((r) => memberPaymentIds.has(r.payment_id));
     for (const rec of memberReceipts) {
       const recTombstone: Receipt = {
         ...rec,
         deleted_at: nowIso,
         deleted_by: deviceId,
-        updated_at: nowIso,
       };
       await putInStore('receipts', recTombstone);
       await enqueueSync('receipts', rec.id, 'DELETE', recTombstone);
@@ -683,7 +683,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setMembers((prev) => prev.filter((m) => m.id !== id));
     setMemberships((prev) => prev.filter((ms) => ms.member_id !== id));
     setPayments((prev) => prev.filter((p) => p.member_id !== id));
-    setReceipts((prev) => prev.filter((r) => r.member_id !== id));
+    setReceipts((prev) => prev.filter((r) => !memberPaymentIds.has(r.payment_id)));
 
     // 6. Trigger sync
     processSyncQueue();
