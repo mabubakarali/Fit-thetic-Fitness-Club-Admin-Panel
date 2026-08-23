@@ -35,6 +35,7 @@ export const DAWOOD_ADMIN: Profile = {
 
 interface AuthContextType {
   user: Profile | null;
+  isAuthenticated: boolean;
   gym: Gym | null;
   activeGymId: string;
   authMode: 'offline_standalone' | 'cloud_synced';
@@ -158,6 +159,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         user,
+        isAuthenticated: !!user,
         gym,
         activeGymId: FIT_THETIC_GYM.id,
         authMode,
