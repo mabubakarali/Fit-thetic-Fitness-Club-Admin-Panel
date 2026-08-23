@@ -1,0 +1,126 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 13% 18%;        /* #2B2D31 */
+    --foreground: 220 13% 96%;        /* #F2F3F5 */
+    --card: 220 7% 21%;               /* #313338 */
+    --card-foreground: 220 13% 96%;
+    --popover: 220 7% 21%;
+    --popover-foreground: 220 13% 96%;
+    --primary: 235 86% 65%;          /* #5865F2 Discord Blurple */
+    --primary-hover: 235 51% 52%;    /* #4752C4 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 225 7% 17%;         /* #26282C */
+    --secondary-foreground: 220 13% 96%;
+    --muted: 220 6% 23%;             /* #383A40 */
+    --muted-foreground: 216 8% 62%;  /* #949BA4 */
+    --accent: 235 86% 65%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 358 66% 54%;      /* #DA373C Discord Red */
+    --destructive-foreground: 0 0% 100%;
+    --border: 225 6% 25%;            /* #3F4147 */
+    --input: 225 6% 25%;
+    --ring: 235 86% 65%;
+    --radius: 0.5rem;                /* Discord rounded-[8px] */
+  }
+
+  .dark {
+    --background: 225 6% 13%;        /* #1E1F22 Discord Dark App Bg */
+    --foreground: 220 13% 96%;        /* #F2F3F5 Discord Text */
+    --card: 220 7% 21%;               /* #313338 Discord Container */
+    --card-foreground: 220 13% 96%;
+    --popover: 225 7% 17%;           /* #2B2D31 */
+    --popover-foreground: 220 13% 96%;
+    --primary: 235 86% 65%;          /* #5865F2 Discord Blurple */
+    --primary-hover: 235 51% 52%;    /* #4752C4 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 6% 23%;         /* #383A40 */
+    --secondary-foreground: 220 13% 96%;
+    --muted: 225 7% 17%;             /* #2B2D31 */
+    --muted-foreground: 216 8% 62%;  /* #949BA4 */
+    --accent: 235 86% 65%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 358 66% 54%;      /* #DA373C */
+    --destructive-foreground: 0 0% 100%;
+    --border: 225 6% 25%;            /* #3F4147 */
+    --input: 225 6% 25%;
+    --ring: 235 86% 65%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased selection:bg-[#5865F2] selection:text-white;
+    font-family: "gg sans", "Noto Sans", Inter, system-ui, -apple-system, sans-serif;
+  }
+}
+
+/* Discord Style Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #2B2D31;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1A1B1E;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #111214;
+}
+
+/* Discord Style Modal Animation */
+@keyframes discordModalEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-modal {
+  animation: discordModalEnter 0.12s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+}
+
+/* Print Specific Rules for Receipts */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  
+  #printable-receipt,
+  #printable-receipt * {
+    visibility: visible;
+  }
+
+  #printable-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: white !important;
+    color: black !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
