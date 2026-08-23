@@ -1,12 +1,11 @@
 {
-  "version": 2,
   "rewrites": [
     {
-      "source": "/api/(.*)",
+      "source": "/api/:path*",
       "destination": "/api/index.js"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!assets|images|favicon\\.svg|manifest\\.json|sw\\.js|.*\\.[\\w]+$).*)",
       "destination": "/index.html"
     }
   ]
