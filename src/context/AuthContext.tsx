@@ -1,23 +1,6 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { Profile, Gym } from '@/types/database';
-import { setSyncContext } from '@/lib/syncEngine';
-
-export type AuthMode = 'cloud_synced' | 'offline_standalone';
-
-interface AuthContextType {
-  user: Profile | null;
-  gym: Gym | null;
-  activeGymId: string;
-  authMode: AuthMode;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  isCloudConfigured: boolean;
-
-  login: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => Promise<void>;
-  updateGymDetails: (updates: Partial<Gym>) => void;
-}
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Profile, Gym, UserRole } from '@/types/database';
+import { setSyncContext, getApiUrl, setAuthToken, processSyncQueue } from '@/lib/syncEngine';
 
 export const FIT_THETIC_GYM: Gym = {
   id: '00000000-0000-0000-0000-000000000001',
@@ -28,61 +11,67 @@ export const FIT_THETIC_GYM: Gym = {
   currency: 'Rs.',
   receipt_footer: 'Thank you for choosing Fit-Thetic Fitness Club! Registration & fees are non-refundable.',
   whatsapp_reminders_enabled: true,
-  reminder_settings: { d7: true, d3: true, d1: true, d0: true },
-  created_at: '2026-08-22T00:00:00Z',
+  reminder_settings: {
+    d7: true,
+    d3: true,
+    d1: true,
+    d0: true,
+  },
+  created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 };
 
 export const DAWOOD_ADMIN: Profile = {
-  id: '00000000-0000-0000-0000-000000000002',
+  id: 'admin-001',
+  auth_user_id: 'admin-001',
   gym_id: FIT_THETIC_GYM.id,
   email: 'dawood@gmail.com',
   full_name: 'Dawood Janjua (Owner / Head Trainer)',
   phone: '03216422429',
   role: 'owner',
-  created_at: '2026-08-22T00:00:00Z',
+  created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 };
+
+interface AuthContextType {
+  user: Profile | null;
+  gym: Gym | null;
+  activeGymId: string;
+  authMode: 'offline_standalone' | 'cloud_synced';
+  isLoading: boolean;
+  login: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => void;
+  setOperatingMode: (mode: 'offline_standalone' | 'cloud_synced') => void;
+}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [authMode] = useState<AuthMode>('cloud_synced');
-
   const [user, setUser] = useState<Profile | null>(() => {
-    const saved = localStorage.getItem('fit_thetic_auth_user');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return null;
-      }
+    try {
+      const saved = localStorage.getItem('fit_thetic_auth_user');
+      return saved ? JSON.parse(saved) : DAWOOD_ADMIN;
+    } catch {
+      return DAWOOD_ADMIN;
     }
-    return null;
   });
 
   const [gym, setGym] = useState<Gym | null>(() => {
-    const saved = localStorage.getItem('fit_thetic_active_gym');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return FIT_THETIC_GYM;
-      }
+    try {
+      const saved = localStorage.getItem('fit_thetic_active_gym');
+      return saved ? JSON.parse(saved) : FIT_THETIC_GYM;
+    } catch {
+      return FIT_THETIC_GYM;
     }
-    return FIT_THETIC_GYM;
   });
 
+  const [authMode, setAuthMode] = useState<'offline_standalone' | 'cloud_synced'>('cloud_synced');
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Sync Engine Context initialization
   useEffect(() => {
-    const gymId = gym?.id || FIT_THETIC_GYM.id;
-    const gymName = gym?.name || FIT_THETIC_GYM.name;
-    setSyncContext('cloud_synced', gymId, gymName);
-  }, [gym]);
+    setSyncContext('cloud_synced', FIT_THETIC_GYM.id, FIT_THETIC_GYM.name);
+  }, []);
 
-  // Persist auth state
   useEffect(() => {
     if (user) {
       localStorage.setItem('fit_thetic_auth_user', JSON.stringify(user));
@@ -99,135 +88,83 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const cleanEmail = (email || 'dawood@gmail.com').trim().toLowerCase();
     const cleanPass = (pass || '1234').trim();
-    const supabasePass = cleanPass.length < 6 ? `dawood_${cleanPass}_pass` : cleanPass;
 
-    // 1. If Supabase is configured and online, attempt cloud authentication in background
-    if (isSupabaseConfigured && supabase && navigator.onLine) {
-      try {
-        // Attempt sign in
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+    try {
+      const apiUrl = getApiUrl();
+      const res = await fetch(`${apiUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, password: cleanPass }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.token) {
+          setAuthToken(data.token);
+        }
+        const profile: Profile = {
+          id: data.user?.id || 'admin-001',
+          auth_user_id: data.user?.id || 'admin-001',
+          gym_id: FIT_THETIC_GYM.id,
           email: cleanEmail,
-          password: supabasePass,
-        });
-
-        if (signInData?.user) {
-          const profile: Profile = {
-            id: signInData.user.id,
-            auth_user_id: signInData.user.id,
-            gym_id: FIT_THETIC_GYM.id,
-            email: cleanEmail,
-            full_name: 'Dawood Janjua (Owner / Head Trainer)',
-            phone: '03216422429',
-            role: 'owner',
-            created_at: signInData.user.created_at,
-            updated_at: new Date().toISOString(),
-          };
-          setUser(profile);
+          full_name: data.user?.full_name || 'Dawood Janjua',
+          phone: '03216422429',
+          role: (data.user?.role as UserRole) || 'owner',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        setUser(profile);
+        setGym(FIT_THETIC_GYM);
+        setIsLoading(false);
+        processSyncQueue();
+        return { success: true };
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        // If offline fallback with default credentials
+        if (cleanEmail === 'dawood@gmail.com' && cleanPass === '1234') {
+          setUser(DAWOOD_ADMIN);
           setGym(FIT_THETIC_GYM);
           setIsLoading(false);
           return { success: true };
         }
-
-        // If not registered yet, auto sign-up
-        if (signInError) {
-          const { data: signUpData } = await supabase.auth.signUp({
-            email: cleanEmail,
-            password: supabasePass,
-            options: {
-              data: {
-                full_name: 'Dawood Janjua',
-                gym_name: 'Fit-Thetic Fitness Club',
-              },
-            },
-          });
-
-          const createdUserId = signUpData?.user?.id || DAWOOD_ADMIN.id;
-
-          // Attempt initializing gym record if table exists
-          try {
-            await supabase.from('gyms').upsert({
-              id: FIT_THETIC_GYM.id,
-              name: FIT_THETIC_GYM.name,
-              phone: FIT_THETIC_GYM.phone,
-              email: cleanEmail,
-              address: FIT_THETIC_GYM.address,
-              currency: FIT_THETIC_GYM.currency,
-              receipt_footer: FIT_THETIC_GYM.receipt_footer,
-            });
-
-            if (signUpData?.session) {
-              await supabase.from('gym_users').upsert({
-                user_id: createdUserId,
-                gym_id: FIT_THETIC_GYM.id,
-                role: 'owner',
-                full_name: 'Dawood Janjua',
-                email: cleanEmail,
-                phone: '03216422429',
-              });
-            }
-          } catch (e) {}
-
-          const profile: Profile = {
-            id: createdUserId,
-            auth_user_id: createdUserId,
-            gym_id: FIT_THETIC_GYM.id,
-            email: cleanEmail,
-            full_name: 'Dawood Janjua (Owner / Head Trainer)',
-            phone: '03216422429',
-            role: 'owner',
-            created_at: signUpData?.user?.created_at || new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
-          setUser(profile);
-          setGym(FIT_THETIC_GYM);
-          setIsLoading(false);
-          return { success: true };
-        }
-      } catch (err) {
-        // Fall through to instant local login
+        setIsLoading(false);
+        return { success: false, error: errData.error || 'Invalid email or password' };
       }
-    }
-
-    // 2. Always log in directly as Dawood Janjua
-    const profile: Profile = {
-      ...DAWOOD_ADMIN,
-      email: cleanEmail,
-    };
-    setUser(profile);
-    setGym(FIT_THETIC_GYM);
-    setIsLoading(false);
-    return { success: true };
-  };
-
-  const updateGymDetails = (updates: Partial<Gym>) => {
-    if (gym) {
-      const updated = { ...gym, ...updates, updated_at: new Date().toISOString() };
-      setGym(updated);
+    } catch {
+      // Offline fallback: allow default admin login
+      if (cleanEmail === 'dawood@gmail.com' && cleanPass === '1234') {
+        setUser(DAWOOD_ADMIN);
+        setGym(FIT_THETIC_GYM);
+        setIsLoading(false);
+        return { success: true };
+      }
+      setIsLoading(false);
+      return { success: false, error: 'Could not connect to authentication server' };
     }
   };
 
-  const logout = async () => {
-    if (isSupabaseConfigured && supabase) {
-      try {
-        await supabase.auth.signOut();
-      } catch (e) {}
-    }
+  const logout = () => {
     setUser(null);
+    setAuthToken(null);
+    localStorage.removeItem('fit_thetic_auth_user');
+  };
+
+  const setOperatingMode = (mode: 'offline_standalone' | 'cloud_synced') => {
+    setAuthMode(mode);
+    setSyncContext(mode, FIT_THETIC_GYM.id, FIT_THETIC_GYM.name);
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        gym: gym || FIT_THETIC_GYM,
-        activeGymId: (gym && gym.id) || FIT_THETIC_GYM.id,
+        gym,
+        activeGymId: FIT_THETIC_GYM.id,
         authMode,
-        isAuthenticated: Boolean(user),
         isLoading,
-        isCloudConfigured: true,
         login,
         logout,
-        updateGymDetails,
+        setOperatingMode,
       }}
     >
       {children}
