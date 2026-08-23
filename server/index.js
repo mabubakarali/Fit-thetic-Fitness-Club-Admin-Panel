@@ -376,18 +376,7 @@ app.get('/api/sync/pull', authMiddleware, async (req, res) => {
 
     if (!useEmbedded && mongoDb) {
       for (const colName of collections) {
-        let filter = {};
-        if (since && typeof since === 'string' && since.trim() !== '') {
-          filter = {
-            $or: [
-              { updated_at: { $gt: since } },
-              { deleted_at: { $gt: since } },
-              { created_at: { $gt: since } },
-            ],
-          };
-        }
-
-        const docs = await mongoDb.collection(colName).find(filter).toArray();
+        const docs = await mongoDb.collection(colName).find({}).toArray();
         result[colName] = docs.map((d) => {
           const { _id, ...rest } = d;
           return { id: _id, ...rest };
@@ -395,16 +384,7 @@ app.get('/api/sync/pull', authMiddleware, async (req, res) => {
       }
     } else {
       for (const colName of collections) {
-        const allItems = Object.values(embeddedStore[colName] || {});
-        if (since && typeof since === 'string' && since.trim() !== '') {
-          result[colName] = allItems.filter((item) => {
-            const up = item.updated_at || item.created_at || '';
-            const del = item.deleted_at || '';
-            return up > since || del > since;
-          });
-        } else {
-          result[colName] = allItems;
-        }
+        result[colName] = Object.values(embeddedStore[colName] || {});
       }
     }
 

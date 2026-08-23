@@ -181,27 +181,16 @@ app.post('/api/sync/push', authMiddleware, async (req, res) => {
   }
 });
 
-// Incremental Pull
+// Reliable Cloud Sync Pull
 app.get('/api/sync/pull', authMiddleware, async (req, res) => {
   try {
-    const { since } = req.query;
     const collections = ['gym_settings', 'membership_plans', 'members', 'memberships', 'payments', 'receipts', 'whatsapp_reminders'];
     const db = await getDatabase();
     const result = {};
 
     if (db) {
       for (const colName of collections) {
-        let filter = {};
-        if (since && typeof since === 'string' && since.trim() !== '') {
-          filter = {
-            $or: [
-              { updated_at: { $gt: since } },
-              { deleted_at: { $gt: since } },
-              { created_at: { $gt: since } },
-            ],
-          };
-        }
-        const docs = await db.collection(colName).find(filter).toArray();
+        const docs = await db.collection(colName).find({}).toArray();
         result[colName] = docs.map((d) => {
           const { _id, ...rest } = d;
           return { id: _id, ...rest };
@@ -209,12 +198,7 @@ app.get('/api/sync/pull', authMiddleware, async (req, res) => {
       }
     } else {
       for (const colName of collections) {
-        const allItems = Object.values(memoryStore[colName] || {});
-        if (since && typeof since === 'string' && since.trim() !== '') {
-          result[colName] = allItems.filter((item) => (item.updated_at || '') > since || (item.deleted_at || '') > since);
-        } else {
-          result[colName] = allItems;
-        }
+        result[colName] = Object.values(memoryStore[colName] || {});
       }
     }
 
