@@ -256,6 +256,20 @@ app.post('/api/sync/push', authMiddleware, async (req, res) => {
             },
             { upsert: true }
           );
+          if (item.entity === 'members') {
+            await mongoDb.collection('memberships').updateMany(
+              { member_id: recordId },
+              { $set: { deleted_at: nowIso, updated_at: nowIso } }
+            );
+            await mongoDb.collection('payments').updateMany(
+              { member_id: recordId },
+              { $set: { deleted_at: nowIso, updated_at: nowIso } }
+            );
+            await mongoDb.collection('receipts').updateMany(
+              { member_id: recordId },
+              { $set: { deleted_at: nowIso, updated_at: nowIso } }
+            );
+          }
           pushed++;
         } else if (item.entity === 'payments' || item.entity === 'receipts') {
           // FINANCIAL RECORDS: Append-only / Idempotent Insert (Never overwrite)

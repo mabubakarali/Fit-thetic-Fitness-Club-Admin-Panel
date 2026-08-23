@@ -286,22 +286,26 @@ export async function processSyncQueue(): Promise<{
               }
             }
 
-            // 2d. Payments (Immutable Audit Records)
+            // 2d. Payments (Immutable Audit Records + Tombstones)
             if (data.payments && Array.isArray(data.payments)) {
               for (const item of data.payments) {
                 const local = await getFromStore<Payment>('payments', item.id);
-                if (!local) {
+                if (item.deleted_at) {
+                  if (local) await deleteFromStore('payments', item.id);
+                } else if (!local) {
                   await putInStore('payments', item);
                   pulled++;
                 }
               }
             }
 
-            // 2e. Receipts (Immutable Audit Records)
+            // 2e. Receipts (Immutable Audit Records + Tombstones)
             if (data.receipts && Array.isArray(data.receipts)) {
               for (const item of data.receipts) {
                 const local = await getFromStore<Receipt>('receipts', item.id);
-                if (!local) {
+                if (item.deleted_at) {
+                  if (local) await deleteFromStore('receipts', item.id);
+                } else if (!local) {
                   await putInStore('receipts', item);
                   pulled++;
                 }

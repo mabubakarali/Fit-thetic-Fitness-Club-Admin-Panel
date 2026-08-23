@@ -135,6 +135,20 @@ app.post('/api/sync/push', authMiddleware, async (req, res) => {
             { $set: { deleted_at: item.payload?.deleted_at || nowIso, deleted_by: item.device_id || 'remote', updated_at: nowIso } },
             { upsert: true }
           );
+          if (item.entity === 'members') {
+            await db.collection('memberships').updateMany(
+              { member_id: recordId },
+              { $set: { deleted_at: nowIso, updated_at: nowIso } }
+            );
+            await db.collection('payments').updateMany(
+              { member_id: recordId },
+              { $set: { deleted_at: nowIso, updated_at: nowIso } }
+            );
+            await db.collection('receipts').updateMany(
+              { member_id: recordId },
+              { $set: { deleted_at: nowIso, updated_at: nowIso } }
+            );
+          }
         } else if (item.entity === 'payments' || item.entity === 'receipts') {
           const doc = { ...item.payload, _id: recordId, id: recordId, created_at: item.payload?.created_at || nowIso };
           await collection.updateOne({ _id: recordId }, { $setOnInsert: doc }, { upsert: true });
