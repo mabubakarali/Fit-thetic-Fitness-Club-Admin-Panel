@@ -1133,8 +1133,11 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const resetToDemoData = async () => {
     setIsLoading(true);
+    localStorage.removeItem('fit_thetic_last_synced');
     await clearAllStores();
+    await processSyncQueue();
     await loadDataFromIDB();
+    setIsLoading(false);
   };
 
   const forceSyncNow = async () => {
