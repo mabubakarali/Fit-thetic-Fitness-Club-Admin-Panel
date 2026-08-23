@@ -18,7 +18,10 @@ import {
 type SyncListener = (state: SyncState) => void;
 const listeners: Set<SyncListener> = new Set();
 
-const DEFAULT_API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
+const DEFAULT_API_URL =
+  (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app'))
+    ? window.location.origin
+    : (import.meta as any).env?.VITE_API_URL || 'https://fit-thetic.vercel.app';
 
 export function getApiUrl(): string {
   return localStorage.getItem('fit_thetic_api_url') || DEFAULT_API_URL;
