@@ -252,7 +252,10 @@ export async function processSyncQueue(): Promise<{
               for (const item of data.membership_plans) {
                 const local = await getFromStore<MembershipPlan>('membership_plans', item.id);
                 if (item.deleted_at) {
-                  if (local) await deleteFromStore('membership_plans', item.id);
+                  if (local) {
+                    await deleteFromStore('membership_plans', item.id);
+                    pulled++;
+                  }
                 } else if (!local || !local.updated_at || new Date(item.updated_at) >= new Date(local.updated_at)) {
                   await putInStore('membership_plans', item);
                   pulled++;
@@ -265,7 +268,10 @@ export async function processSyncQueue(): Promise<{
               for (const item of data.members) {
                 const local = await getFromStore<Member>('members', item.id);
                 if (item.deleted_at) {
-                  if (local) await deleteFromStore('members', item.id);
+                  if (local) {
+                    await deleteFromStore('members', item.id);
+                    pulled++;
+                  }
                 } else if (!local || !local.updated_at || new Date(item.updated_at) >= new Date(local.updated_at)) {
                   await putInStore('members', item);
                   pulled++;
@@ -278,7 +284,10 @@ export async function processSyncQueue(): Promise<{
               for (const item of data.memberships) {
                 const local = await getFromStore<Membership>('memberships', item.id);
                 if (item.deleted_at) {
-                  if (local) await deleteFromStore('memberships', item.id);
+                  if (local) {
+                    await deleteFromStore('memberships', item.id);
+                    pulled++;
+                  }
                 } else if (!local || !local.updated_at || new Date(item.updated_at) >= new Date(local.updated_at)) {
                   await putInStore('memberships', item);
                   pulled++;
@@ -291,7 +300,10 @@ export async function processSyncQueue(): Promise<{
               for (const item of data.payments) {
                 const local = await getFromStore<Payment>('payments', item.id);
                 if (item.deleted_at) {
-                  if (local) await deleteFromStore('payments', item.id);
+                  if (local) {
+                    await deleteFromStore('payments', item.id);
+                    pulled++;
+                  }
                 } else if (!local) {
                   await putInStore('payments', item);
                   pulled++;
@@ -304,7 +316,10 @@ export async function processSyncQueue(): Promise<{
               for (const item of data.receipts) {
                 const local = await getFromStore<Receipt>('receipts', item.id);
                 if (item.deleted_at) {
-                  if (local) await deleteFromStore('receipts', item.id);
+                  if (local) {
+                    await deleteFromStore('receipts', item.id);
+                    pulled++;
+                  }
                 } else if (!local) {
                   await putInStore('receipts', item);
                   pulled++;

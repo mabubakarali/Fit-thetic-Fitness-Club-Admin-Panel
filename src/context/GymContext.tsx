@@ -248,19 +248,32 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     loadDataFromIDB();
     const unsubSync = subscribeToSync(setSyncState);
 
-    // Continuous real-time background sync interval (every 4 seconds)
-    const interval = setInterval(async () => {
+    const triggerSyncAndReload = async () => {
       if (typeof navigator !== 'undefined' && navigator.onLine) {
         const res = await processSyncQueue();
         if (res.pulled > 0 || res.pushed > 0) {
           await loadDataFromIDB();
         }
       }
-    }, 4000);
+    };
+
+    // Continuous real-time background sync interval (every 2.5 seconds)
+    const interval = setInterval(triggerSyncAndReload, 2500);
+
+    const handleFocusOrOnline = () => {
+      triggerSyncAndReload();
+    };
+
+    window.addEventListener('focus', handleFocusOrOnline);
+    window.addEventListener('online', handleFocusOrOnline);
+    document.addEventListener('visibilitychange', handleFocusOrOnline);
 
     return () => {
       unsubSync();
       clearInterval(interval);
+      window.removeEventListener('focus', handleFocusOrOnline);
+      window.removeEventListener('online', handleFocusOrOnline);
+      document.removeEventListener('visibilitychange', handleFocusOrOnline);
     };
   }, [loadDataFromIDB]);
 
