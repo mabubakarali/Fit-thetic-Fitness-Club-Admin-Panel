@@ -762,7 +762,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         membership_id: membershipId,
         amount: payAmount,
         payment_method: immediatePayment.method,
-        payment_date: startDate,
+        payment_date: format(new Date(), 'yyyy-MM-dd'),
         transaction_reference: immediatePayment.ref,
         notes: immediatePayment.notes || `Renewal payment for ${plan.name}`,
         updated_by: deviceId,
@@ -800,6 +800,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
+    processSyncQueue();
     return { membership: newMembership, receipt: createdReceipt, enrichedReceipt };
   };
 

@@ -1,6 +1,20 @@
-const CACHE_NAME = 'fit-thetic-cache-v2';
+const CACHE_NAME = 'fit-thetic-cache-v3';
+const STATIC_ASSETS = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/favicon.svg',
+  '/app-logo.png',
+];
 
 self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(STATIC_ASSETS).catch((err) => {
+        console.warn('Pre-cache non-fatal error:', err);
+      });
+    })
+  );
   self.skipWaiting();
 });
 
@@ -8,7 +22,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
-        keys.map((key) => caches.delete(key))
+        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
       );
     })
   );
@@ -23,26 +37,29 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network-first strategy for scripts and assets
+  // Stale-while-revalidate / Cache-first with Network Fallback
   event.respondWith(
-    fetch(event.request)
-      .then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
-          const responseClone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone);
-          });
-        }
-        return networkResponse;
-      })
-      .catch(() => {
-        return caches.match(event.request).then((cachedResponse) => {
-          if (cachedResponse) return cachedResponse;
+    caches.match(event.request).then((cachedResponse) => {
+      const fetchPromise = fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseClone);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          // If offline and navigating to any route (e.g. /login, /members), return cached index.html
           if (event.request.mode === 'navigate') {
             return caches.match('/index.html') || caches.match('/');
           }
-          return new Response('Network error', { status: 408, headers: { 'Content-Type': 'text/plain' } });
+          return cachedResponse;
         });
-      })
+
+      // If cached response exists, return it immediately; otherwise wait for fetch
+      return cachedResponse || fetchPromise;
+    })
   );
 });
