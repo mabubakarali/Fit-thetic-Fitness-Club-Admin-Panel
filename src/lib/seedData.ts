@@ -14,14 +14,14 @@ const fmtIso = (d: Date) => d.toISOString();
 
 export const SEED_GYM_SETTINGS: GymSettings = {
   id: 'sett-001',
-  gym_name: 'Fit-Thetic Fitness Club',
+  gym_name: 'Fit-thetic Fitness Club',
   owner_name: 'Dawood Janjua',
   logo_url: '',
-  phone: '03216422429',
-  email: 'dawood@fit-thetic.pk',
+  phone: '03330538182',
+  email: 'dawood@gmail.com',
   address: 'Royal Avenue, Meherban Colony, Chak Shahzad, Isb',
   currency: 'Rs.',
-  receipt_footer: 'Thank you for training with Fit-Thetic Fitness Club! Membership fees are strictly non-refundable.',
+  receipt_footer: 'Thank you for choosing Fit-thetic Fitness Club! Registration & fees are non-refundable.',
   whatsapp_reminders_enabled: true,
   reminder_settings: {
     d7: true,

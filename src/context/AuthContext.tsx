@@ -4,12 +4,12 @@ import { setSyncContext, getApiUrl, setAuthToken, processSyncQueue } from '@/lib
 
 export const FIT_THETIC_GYM: Gym = {
   id: '00000000-0000-0000-0000-000000000001',
-  name: 'Fit-Thetic Fitness Club',
-  phone: '03216422429',
+  name: 'Fit-thetic Fitness Club',
+  phone: '03330538182',
   email: 'dawood@gmail.com',
   address: 'Royal Avenue, Meherban Colony, Chak Shahzad, Isb',
   currency: 'Rs.',
-  receipt_footer: 'Thank you for choosing Fit-Thetic Fitness Club! Registration & fees are non-refundable.',
+  receipt_footer: 'Thank you for choosing Fit-thetic Fitness Club! Registration & fees are non-refundable.',
   whatsapp_reminders_enabled: true,
   reminder_settings: {
     d7: true,
@@ -27,7 +27,7 @@ export const DAWOOD_ADMIN: Profile = {
   gym_id: FIT_THETIC_GYM.id,
   email: 'dawood@gmail.com',
   full_name: 'Dawood Janjua (Owner / Head Trainer)',
-  phone: '03216422429',
+  phone: '03330538182',
   role: 'owner',
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
