@@ -61,15 +61,50 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Auto calculate end date and amount when plan or start date changes
+  const handleStartDateChange = (newStart: string) => {
+    setStartDate(newStart);
+    setIsEndDateOverridden(false);
+    const plan = availablePlans.find((p) => p.id === selectedPlanId) || defaultPlan;
+    if (plan && newStart) {
+      const [y, m, d] = newStart.split('-').map(Number);
+      if (y && m && d) {
+        const startObj = new Date(y, m - 1, d);
+        const endObj = addDays(startObj, plan.duration_days);
+        setEndDate(format(endObj, 'yyyy-MM-dd'));
+      }
+    }
+  };
+
+  const handlePlanChange = (newPlanId: string) => {
+    setSelectedPlanId(newPlanId);
+    setIsEndDateOverridden(false);
+    const plan = availablePlans.find((p) => p.id === newPlanId) || defaultPlan;
+    if (plan) {
+      setPaymentAmount(plan.price);
+      if (startDate) {
+        const [y, m, d] = startDate.split('-').map(Number);
+        if (y && m && d) {
+          const startObj = new Date(y, m - 1, d);
+          const endObj = addDays(startObj, plan.duration_days);
+          setEndDate(format(endObj, 'yyyy-MM-dd'));
+        }
+      }
+    }
+  };
+
+  // Initial calculation on mount / plan change
   useEffect(() => {
     const plan = availablePlans.find((p) => p.id === selectedPlanId) || defaultPlan;
-    if (plan && startDate && !isEndDateOverridden) {
-      const calculatedEnd = format(addDays(new Date(startDate), plan.duration_days), 'yyyy-MM-dd');
-      setEndDate(calculatedEnd);
+    if (plan && startDate && !endDate) {
+      const [y, m, d] = startDate.split('-').map(Number);
+      if (y && m && d) {
+        const startObj = new Date(y, m - 1, d);
+        const endObj = addDays(startObj, plan.duration_days);
+        setEndDate(format(endObj, 'yyyy-MM-dd'));
+      }
       setPaymentAmount(plan.price);
     }
-  }, [selectedPlanId, startDate, availablePlans, defaultPlan, isEndDateOverridden]);
+  }, [selectedPlanId, startDate, availablePlans, defaultPlan, endDate]);
 
   // Check phone duplicate
   const isDuplicatePhone =
@@ -264,10 +299,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
               <Select
                 label="Select Plan *"
                 value={selectedPlanId}
-                onChange={(e) => {
-                  setSelectedPlanId(e.target.value);
-                  setIsEndDateOverridden(false);
-                }}
+                onChange={(e) => handlePlanChange(e.target.value)}
                 options={availablePlans
                   .filter((p) => p.is_active)
                   .map((p) => ({
@@ -281,10 +313,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
               label="Start Date *"
               type="date"
               value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-                setIsEndDateOverridden(false);
-              }}
+              onChange={(e) => handleStartDateChange(e.target.value)}
               error={errors.startDate}
               required
             />

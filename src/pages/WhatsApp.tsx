@@ -21,7 +21,7 @@ import { format } from 'date-fns';
 
 export const WhatsApp: React.FC = () => {
   const {
-    expiringMembers,
+    enrichedMembers,
     reminders,
     members,
     settings,
@@ -32,13 +32,25 @@ export const WhatsApp: React.FC = () => {
 
   const [selectedReminderForPreview, setSelectedReminderForPreview] = useState<WhatsAppReminder | null>(null);
 
+  // All members who are expired or expiring soon (within 7 days)
+  const actionableMembers = enrichedMembers
+    .filter(
+      (m) =>
+        m.status !== 'inactive' &&
+        m.current_membership &&
+        (m.timing_status === 'expired' || m.timing_status === 'expiring_soon' || m.days_remaining <= 7)
+    )
+    .sort((a, b) => a.days_remaining - b.days_remaining);
+
   const handleSendReminder = async (
     memberId: string,
-    membershipId: string,
-    type: ReminderType
+    membershipId?: string,
+    type: ReminderType = '7_days_before'
   ) => {
     try {
-      await generateReminder(memberId, membershipId, type);
+      if (membershipId) {
+        await generateReminder(memberId, membershipId, type);
+      }
       const url = getWhatsAppShareUrl(memberId, membershipId, type);
       window.open(url, '_blank');
       showToast('WhatsApp Dispatched', 'Opening WhatsApp with pre-filled renewal reminder.');
@@ -70,19 +82,19 @@ export const WhatsApp: React.FC = () => {
       <Card className="p-5 space-y-4">
         <div className="flex items-center justify-between border-b border-border/60 pb-3">
           <div>
-            <h3 className="text-sm font-bold text-foreground">Expiring Members Queue</h3>
-            <p className="text-xs text-muted-foreground">Members with upcoming expiry dates needing renewal follow-up</p>
+            <h3 className="text-sm font-bold text-foreground">Expiring & Expired Members Queue</h3>
+            <p className="text-xs text-muted-foreground">Members with overdue subscriptions or upcoming expiry dates needing renewal follow-up</p>
           </div>
-          <Badge variant="expiring" size="sm">
-            {expiringMembers.length} Members Due
+          <Badge variant={actionableMembers.length > 0 ? 'expiring' : 'active'} size="sm">
+            {actionableMembers.length} Members Due
           </Badge>
         </div>
 
-        {expiringMembers.length === 0 ? (
+        {actionableMembers.length === 0 ? (
           <EmptyState
             icon={<CheckCircle2 className="h-6 w-6 text-emerald-500" />}
             title="Reminder Queue Clear"
-            description="No members are currently in the expiry reminder window."
+            description="No members are currently expired or in the upcoming expiry window."
           />
         ) : (
           <Table>
@@ -91,38 +103,48 @@ export const WhatsApp: React.FC = () => {
                 <TableHead>Member</TableHead>
                 <TableHead>Current Plan</TableHead>
                 <TableHead>Expiry Date</TableHead>
-                <TableHead>Time Remaining</TableHead>
+                <TableHead>Status / Remaining</TableHead>
                 <TableHead className="text-right">Action</TableHead>
               </tr>
             </TableHeader>
             <TableBody>
-              {expiringMembers.map((item) => {
+              {actionableMembers.map((member) => {
                 const milestone: ReminderType =
-                  item.days_remaining === 0
+                  member.days_remaining < 0
                     ? 'on_expiry'
-                    : item.days_remaining <= 1
+                    : member.days_remaining === 0
+                    ? 'on_expiry'
+                    : member.days_remaining <= 1
                     ? '1_day_before'
-                    : item.days_remaining <= 3
+                    : member.days_remaining <= 3
                     ? '3_days_before'
                     : '7_days_before';
 
                 return (
-                  <TableRow key={item.member.id}>
+                  <TableRow key={member.id}>
                     <TableCell>
                       <div>
-                        <span className="font-semibold text-foreground">{item.member.full_name}</span>
+                        <span className="font-semibold text-foreground">{member.full_name}</span>
                         <p className="text-[11px] font-mono text-muted-foreground">
-                          {item.member.member_code} • {item.member.phone}
+                          {member.member_code} • {member.phone}
                         </p>
                       </div>
                     </TableCell>
 
-                    <TableCell className="text-xs font-medium">{item.plan.name}</TableCell>
-                    <TableCell className="text-xs font-mono">{item.end_date}</TableCell>
+                    <TableCell className="text-xs font-medium">{member.current_plan?.name || 'Standard'}</TableCell>
+                    <TableCell className="text-xs font-mono">{member.current_membership?.end_date || '—'}</TableCell>
 
                     <TableCell>
-                      <Badge variant={item.days_remaining <= 2 ? 'expired' : 'expiring'} size="sm" dot>
-                        {item.days_remaining === 0 ? 'Expires Today' : `${item.days_remaining}d remaining`}
+                      <Badge
+                        variant={member.timing_status === 'expired' || member.days_remaining < 0 ? 'expired' : 'expiring'}
+                        size="sm"
+                        dot
+                      >
+                        {member.days_remaining < 0
+                          ? `Expired (${Math.abs(member.days_remaining)}d ago)`
+                          : member.days_remaining === 0
+                          ? 'Expires Today'
+                          : `${member.days_remaining}d remaining`}
                       </Badge>
                     </TableCell>
 
@@ -131,7 +153,7 @@ export const WhatsApp: React.FC = () => {
                         variant="primary"
                         size="sm"
                         leftIcon={<Send className="h-3.5 w-3.5" />}
-                        onClick={() => handleSendReminder(item.member.id, item.membership.id, milestone)}
+                        onClick={() => handleSendReminder(member.id, member.current_membership?.id, milestone)}
                         className="bg-[#23A55A] hover:bg-[#1f9250] text-white font-bold"
                       >
                         Send WhatsApp

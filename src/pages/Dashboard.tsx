@@ -69,6 +69,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
   const recentPayments = enrichedPayments.slice(0, 6);
   // Recent members (latest 6)
   const recentMembers = enrichedMembers.slice(0, 6);
+  // All actionable expiring & expired members
+  const expiringOrExpired = useMemo(() => {
+    return enrichedMembers
+      .filter((m) => m.status !== 'inactive' && (m.timing_status === 'expired' || m.timing_status === 'expiring_soon' || m.days_remaining <= 7))
+      .sort((a, b) => a.days_remaining - b.days_remaining);
+  }, [enrichedMembers]);
 
   return (
     <div className="space-y-6">
@@ -332,13 +338,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
 
         {/* Tab Content */}
         <div className="p-4 sm:p-5">
-          {/* TAB 1: EXPIRING SOON */}
+          {/* TAB 1: EXPIRING SOON & EXPIRED */}
           {activeTab === 'expiring' && (
             <div>
-              {expiringMembers.length === 0 ? (
+              {expiringOrExpired.length === 0 ? (
                 <EmptyState
                   icon={<Clock className="h-6 w-6" />}
-                  title="No Members Expiring Soon"
+                  title="No Expiring or Expired Members"
                   description="All active members have more than 7 days remaining on their current plans."
                 />
               ) : (
@@ -349,54 +355,57 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
                         <TableHead>Member</TableHead>
                         <TableHead>Current Plan</TableHead>
                         <TableHead>Expiry Date</TableHead>
-                        <TableHead>Days Left</TableHead>
+                        <TableHead>Status / Remaining</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </tr>
                     </TableHeader>
                     <TableBody>
-                      {expiringMembers.map((item) => (
-                        <TableRow key={item.member.id}>
+                      {expiringOrExpired.map((member) => (
+                        <TableRow key={member.id}>
                           <TableCell>
                             <div>
                               <button
-                                onClick={() => onSelectMemberDetail(item.member.id)}
+                                onClick={() => onSelectMemberDetail(member.id)}
                                 className="font-semibold text-foreground hover:text-emerald-500 transition-colors text-left"
                               >
-                                {item.member.full_name}
+                                {member.full_name}
                               </button>
                               <p className="text-[11px] font-mono text-muted-foreground">
-                                {item.member.member_code} • {item.member.phone}
+                                {member.member_code} • {member.phone}
                               </p>
                             </div>
                           </TableCell>
-                          <TableCell className="font-medium text-xs">{item.plan.name}</TableCell>
-                          <TableCell className="text-xs font-mono">{item.end_date}</TableCell>
+                          <TableCell className="font-medium text-xs">{member.current_plan?.name || 'Standard'}</TableCell>
+                          <TableCell className="text-xs font-mono">{member.current_membership?.end_date || '—'}</TableCell>
                           <TableCell>
-                            <Badge variant={item.days_remaining <= 2 ? 'expired' : 'expiring'} size="sm" dot>
-                              {item.days_remaining === 0
+                            <Badge
+                              variant={member.timing_status === 'expired' || member.days_remaining < 0 ? 'expired' : 'expiring'}
+                              size="sm"
+                              dot
+                            >
+                              {member.days_remaining < 0
+                                ? `Expired (${Math.abs(member.days_remaining)}d ago)`
+                                : member.days_remaining === 0
                                 ? 'Expires Today'
-                                : `${item.days_remaining} day${item.days_remaining === 1 ? '' : 's'} left`}
+                                : `${member.days_remaining} day${member.days_remaining === 1 ? '' : 's'} left`}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
                               <a
-                                href={getWhatsAppShareUrl(item.member.id, item.membership.id, '7_days_before')}
+                                href={getWhatsAppShareUrl(member.id)}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 font-medium transition-colors"
+                                className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 font-medium transition-colors border border-emerald-500/20 cursor-pointer"
                               >
                                 <Send className="h-3 w-3" /> WhatsApp
                               </a>
                               <Button
                                 variant="primary"
                                 size="xs"
-                                onClick={() => {
-                                  const em = enrichedMembers.find((m) => m.id === item.member.id);
-                                  if (em) setSelectedMemberForRenew(em);
-                                }}
+                                onClick={() => setSelectedMemberForRenew(member)}
                               >
-                                Renew
+                                {member.timing_status === 'expired' ? 'Pay / Renew' : 'Renew'}
                               </Button>
                             </div>
                           </TableCell>

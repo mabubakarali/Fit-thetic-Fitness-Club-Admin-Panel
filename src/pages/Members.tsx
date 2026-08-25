@@ -24,6 +24,8 @@ import {
   Download,
   Trash2,
   AlertCircle,
+  MessageSquare,
+  Send,
 } from 'lucide-react';
 import { exportMembersToExcelCSV } from '@/lib/exportUtils';
 import { useToast } from '@/components/ui/Toast';
@@ -38,7 +40,16 @@ export const Members: React.FC<MembersProps> = ({
   onSelectMemberDetail,
   searchQueryProp = '',
 }) => {
-  const { enrichedMembers, payments, plans, settings, enrichedReceipts, getEnrichedReceipt, deleteMember } = useGym();
+  const { 
+    enrichedMembers, 
+    payments, 
+    plans, 
+    settings, 
+    enrichedReceipts, 
+    getEnrichedReceipt, 
+    deleteMember,
+    getWhatsAppShareUrl 
+  } = useGym();
   const { showToast } = useToast();
 
   const [searchQuery, setSearchQuery] = useState(searchQueryProp);
@@ -399,6 +410,17 @@ export const Members: React.FC<MembersProps> = ({
 
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        <a
+                          href={getWhatsAppShareUrl(member.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 font-medium transition-colors cursor-pointer"
+                          title="Send fee reminder or greeting via WhatsApp"
+                        >
+                          <MessageSquare className="h-3 w-3" />
+                          <span>WhatsApp</span>
+                        </a>
+
                         <Button
                           variant="primary"
                           size="xs"
@@ -496,6 +518,15 @@ export const Members: React.FC<MembersProps> = ({
                 )}
 
                 <div className="flex items-center justify-end gap-2 pt-1 border-t border-border/60">
+                  <a
+                    href={getWhatsAppShareUrl(member.id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-md bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 font-medium transition-colors cursor-pointer"
+                  >
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    <span>WhatsApp</span>
+                  </a>
                   <Button
                     variant="primary"
                     size="xs"
