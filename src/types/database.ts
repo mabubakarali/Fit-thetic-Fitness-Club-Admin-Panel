@@ -250,6 +250,7 @@ export type SyncEntity =
   | 'receipts'
   | 'membership_plans'
   | 'whatsapp_reminders'
+  | 'gym_settings'
   | 'gyms'
   | 'gym_users';
 
