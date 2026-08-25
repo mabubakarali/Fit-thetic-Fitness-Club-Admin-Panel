@@ -229,8 +229,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setReminders(loadedReminders);
 
         const currentSettings = loadedSettings[0];
-        if (!currentSettings || currentSettings.gym_name.includes('Fit-thetic Gym &') || currentSettings.address.includes('Gulberg')) {
-          const updatedSettings = { ...SEED_GYM_SETTINGS, id: currentSettings?.id || 'sett-001', gym_id: activeGymId };
+        if (!currentSettings) {
+          const updatedSettings = { ...SEED_GYM_SETTINGS, id: 'sett-001', gym_id: activeGymId };
           await putInStore('gym_settings', updatedSettings);
           setSettings(updatedSettings);
         } else {
@@ -1119,17 +1119,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     await putInStore('gym_settings', updated);
-    await enqueueSync('gyms', updated.id, 'UPDATE', {
-      name: updated.gym_name,
-      phone: updated.phone,
-      email: updated.email,
-      address: updated.address,
-      currency: updated.currency,
-      receipt_footer: updated.receipt_footer,
-      whatsapp_reminders_enabled: updated.whatsapp_reminders_enabled,
-      reminder_settings: updated.reminder_settings,
-    });
+    await enqueueSync('gym_settings', updated.id || 'sett-001', 'UPDATE', updated);
     setSettings(updated);
+    processSyncQueue();
   };
 
   const resetToDemoData = async () => {

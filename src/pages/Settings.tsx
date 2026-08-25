@@ -49,6 +49,7 @@ export const Settings: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [gymName, setGymName] = useState(settings.gym_name);
+  const [ownerName, setOwnerName] = useState(settings.owner_name || 'Dawood Janjua');
   const [phone, setPhone] = useState(settings.phone);
   const [email, setEmail] = useState(settings.email || '');
   const [address, setAddress] = useState(settings.address);
@@ -58,6 +59,7 @@ export const Settings: React.FC = () => {
 
   React.useEffect(() => {
     setGymName(settings.gym_name);
+    setOwnerName(settings.owner_name || 'Dawood Janjua');
     setPhone(settings.phone);
     setEmail(settings.email || '');
     setAddress(settings.address);
@@ -76,13 +78,14 @@ export const Settings: React.FC = () => {
     try {
       await updateSettings({
         gym_name: gymName.trim(),
+        owner_name: ownerName.trim(),
         phone: phone.trim(),
         email: email.trim() || undefined,
         address: address.trim(),
         currency: currency.trim() || 'Rs.',
         receipt_footer: receiptFooter.trim(),
       });
-      showToast('Settings Saved', 'Gym profile and receipt information updated.');
+      showToast('Settings Saved', 'Gym profile, owner info, and receipts updated.');
     } catch (err: any) {
       showToast('Error', 'Failed to save settings', 'error');
     } finally {
@@ -398,7 +401,13 @@ export const Settings: React.FC = () => {
             />
 
             <Input
-              label="Contact Phone *"
+              label="Owner / Head Trainer Name *"
+              value={ownerName}
+              onChange={(e) => setOwnerName(e.target.value)}
+            />
+
+            <Input
+              label="Contact Phone / WhatsApp *"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
             />

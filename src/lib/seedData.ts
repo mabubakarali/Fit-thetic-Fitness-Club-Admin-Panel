@@ -15,6 +15,7 @@ const fmtIso = (d: Date) => d.toISOString();
 export const SEED_GYM_SETTINGS: GymSettings = {
   id: 'sett-001',
   gym_name: 'Fit-Thetic Fitness Club',
+  owner_name: 'Dawood Janjua',
   logo_url: '',
   phone: '03216422429',
   email: 'dawood@fit-thetic.pk',

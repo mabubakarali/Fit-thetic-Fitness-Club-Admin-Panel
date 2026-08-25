@@ -162,6 +162,7 @@ export interface GymSettings {
   id: string;
   gym_id?: string;
   gym_name: string;
+  owner_name?: string;
   logo_url?: string;
   phone: string;
   email?: string;

@@ -331,7 +331,11 @@ export async function processSyncQueue(): Promise<{
             if (data.gym_settings && Array.isArray(data.gym_settings) && data.gym_settings.length > 0) {
               const remoteSettings = data.gym_settings[0];
               if (remoteSettings) {
-                await putInStore('gym_settings', remoteSettings);
+                const local = await getFromStore<GymSettings>('gym_settings', remoteSettings.id || 'sett-001');
+                if (!local || !local.updated_at || new Date(remoteSettings.updated_at) >= new Date(local.updated_at)) {
+                  await putInStore('gym_settings', remoteSettings);
+                  pulled++;
+                }
               }
             }
 
