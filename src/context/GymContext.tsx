@@ -56,6 +56,8 @@ interface GymContextType {
   // Real-time KPI statistics
   stats: {
     totalActiveMembers: number;
+    validActiveMembers: number;
+    allRegisteredMembers: number;
     expiringIn7Days: number;
     expiredCount: number;
     unpaidCount: number;
@@ -478,7 +480,13 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const stats = useMemo(() => {
-    const totalActive = members.filter((m) => m.status === 'active' && !m.deleted_at).length;
+    const validActive = enrichedMembers.filter(
+      (m) =>
+        m.status === 'active' &&
+        !m.deleted_at &&
+        (m.timing_status === 'active' || m.timing_status === 'expiring_soon')
+    ).length;
+    const allRegistered = members.filter((m) => m.status === 'active' && !m.deleted_at).length;
     const expiring7 = expiringMembers.length;
     const expired = expiredMembers.length;
     const unpaid = unpaidMembers.length;
@@ -499,7 +507,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     return {
-      totalActiveMembers: totalActive,
+      totalActiveMembers: validActive,
+      validActiveMembers: validActive,
+      allRegisteredMembers: allRegistered,
       expiringIn7Days: expiring7,
       expiredCount: expired,
       unpaidCount: unpaid,
@@ -507,7 +517,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       thisMonthRevenue: thisMonthRev,
       totalRevenueAllTime: totalRev,
     };
-  }, [members, expiringMembers, expiredMembers, unpaidMembers, payments]);
+  }, [members, enrichedMembers, expiringMembers, expiredMembers, unpaidMembers, payments]);
 
   // ----------------------------------------------------
   // Context Actions & Business Logic

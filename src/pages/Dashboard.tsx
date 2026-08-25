@@ -46,7 +46,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
     getWhatsAppShareUrl,
   } = useGym();
 
-  const [activeTab, setActiveTab] = useState<'expiring' | 'recent_payments' | 'unpaid' | 'recent_members'>('expiring');
+  const [activeTab, setActiveTab] = useState<'expiring' | 'expired' | 'unpaid' | 'recent_payments' | 'recent_members'>('expiring');
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -69,10 +69,29 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
   const recentPayments = enrichedPayments.slice(0, 6);
   // Recent members (latest 6)
   const recentMembers = enrichedMembers.slice(0, 6);
-  // All actionable expiring & expired members
-  const expiringOrExpired = useMemo(() => {
+
+  // Members expiring within 7 days (valid active expiring soon)
+  const expiringSoonList = useMemo(() => {
     return enrichedMembers
-      .filter((m) => m.status !== 'inactive' && (m.timing_status === 'expired' || m.timing_status === 'expiring_soon' || m.days_remaining <= 7))
+      .filter(
+        (m) =>
+          m.status !== 'inactive' &&
+          m.current_membership &&
+          m.days_remaining >= 0 &&
+          m.days_remaining <= 7
+      )
+      .sort((a, b) => a.days_remaining - b.days_remaining);
+  }, [enrichedMembers]);
+
+  // Members whose subscriptions have expired (days_remaining < 0)
+  const expiredList = useMemo(() => {
+    return enrichedMembers
+      .filter(
+        (m) =>
+          m.status !== 'inactive' &&
+          m.current_membership &&
+          m.days_remaining < 0
+      )
       .sort((a, b) => a.days_remaining - b.days_remaining);
   }, [enrichedMembers]);
 
@@ -122,8 +141,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard
           title="Active Members"
-          value={stats.totalActiveMembers}
-          subtitle="Registered gym members"
+          value={stats.validActiveMembers}
+          subtitle={`${stats.allRegisteredMembers} total registered`}
           icon={<Users className="h-5 w-5" />}
           variant="emerald"
           onClick={() => onNavigateTab('members')}
@@ -132,19 +151,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
         <StatCard
           title="Expiring < 7 Days"
           value={stats.expiringIn7Days}
-          subtitle="Need renewal reminder"
+          subtitle="Upcoming expiry notices"
           icon={<Clock className="h-5 w-5" />}
           variant="amber"
           onClick={() => setActiveTab('expiring')}
         />
 
         <StatCard
-          title="Unpaid Members"
-          value={stats.unpaidCount}
-          subtitle="Pending fee collections"
+          title="Expired Members"
+          value={stats.expiredCount}
+          subtitle="Overdue subscriptions"
           icon={<AlertCircle className="h-5 w-5" />}
           variant="rose"
-          onClick={() => onNavigateTab('unpaid')}
+          onClick={() => setActiveTab('expired')}
         />
 
         <StatCard
@@ -172,8 +191,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
               <div
                 style={{
                   width: `${
-                    stats.totalActiveMembers > 0
-                      ? Math.max(10, ((stats.totalActiveMembers - stats.expiringIn7Days) / stats.totalActiveMembers) * 100)
+                    stats.allRegisteredMembers > 0
+                      ? Math.max(0, ((stats.validActiveMembers - stats.expiringIn7Days) / stats.allRegisteredMembers) * 100)
                       : 0
                   }%`,
                 }}
@@ -183,8 +202,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
               <div
                 style={{
                   width: `${
-                    stats.totalActiveMembers > 0
-                      ? (stats.expiringIn7Days / stats.totalActiveMembers) * 100
+                    stats.allRegisteredMembers > 0
+                      ? (stats.expiringIn7Days / stats.allRegisteredMembers) * 100
                       : 0
                   }%`,
                 }}
@@ -194,28 +213,43 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
               <div
                 style={{
                   width: `${
-                    stats.totalActiveMembers > 0
-                      ? (stats.unpaidCount / stats.totalActiveMembers) * 100
+                    stats.allRegisteredMembers > 0
+                      ? (stats.expiredCount / stats.allRegisteredMembers) * 100
                       : 0
                   }%`,
                 }}
                 className="bg-rose-500 transition-all"
+                title="Expired"
+              />
+              <div
+                style={{
+                  width: `${
+                    stats.allRegisteredMembers > 0
+                      ? (stats.unpaidCount / stats.allRegisteredMembers) * 100
+                      : 0
+                  }%`,
+                }}
+                className="bg-purple-500 transition-all"
                 title="Unpaid"
               />
             </div>
 
             {/* Legend */}
-            <div className="grid grid-cols-3 gap-2 text-xs text-center pt-2">
+            <div className="grid grid-cols-4 gap-1.5 text-xs text-center pt-2">
               <div className="bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20">
                 <span className="block text-[10px] uppercase font-bold text-emerald-500">Active</span>
-                <span className="font-bold text-foreground">{stats.totalActiveMembers - stats.expiringIn7Days}</span>
+                <span className="font-bold text-foreground">{Math.max(0, stats.validActiveMembers - stats.expiringIn7Days)}</span>
               </div>
               <div className="bg-amber-500/10 p-2 rounded-lg border border-amber-500/20">
                 <span className="block text-[10px] uppercase font-bold text-amber-500">Expiring</span>
                 <span className="font-bold text-foreground">{stats.expiringIn7Days}</span>
               </div>
               <div className="bg-rose-500/10 p-2 rounded-lg border border-rose-500/20">
-                <span className="block text-[10px] uppercase font-bold text-rose-500">Unpaid</span>
+                <span className="block text-[10px] uppercase font-bold text-rose-500">Expired</span>
+                <span className="font-bold text-foreground">{stats.expiredCount}</span>
+              </div>
+              <div className="bg-purple-500/10 p-2 rounded-lg border border-purple-500/20">
+                <span className="block text-[10px] uppercase font-bold text-purple-400">Unpaid</span>
                 <span className="font-bold text-foreground">{stats.unpaidCount}</span>
               </div>
             </div>
@@ -229,28 +263,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
 
         {/* Revenue Summary */}
         <Card className="p-5 lg:col-span-2 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-foreground">Revenue & Collections</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Total collected across verified payment methods</p>
-            </div>
-            <span className="text-xs font-semibold px-2.5 py-1 bg-emerald-500/15 text-emerald-400 rounded-full border border-emerald-500/30">
-              Total: {currency} {stats.totalRevenueAllTime.toLocaleString()}
-            </span>
+          <div>
+            <h3 className="text-sm font-bold text-foreground">Revenue & Collections</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Total collected across verified payment methods</p>
           </div>
 
-          {/* Payment Method Breakdown Pill Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-4">
-            {['cash', 'easypaisa', 'jazzcash', 'bank_transfer'].map((method) => {
-              const totalMethod = enrichedPayments
-                .filter((p) => p.payment_method === method)
-                .reduce((sum, p) => sum + p.amount, 0);
-
-              const countMethod = enrichedPayments.filter((p) => p.payment_method === method).length;
+            {(['cash', 'easypaisa', 'jazzcash', 'bank_transfer'] as const).map((method) => {
+              const totalMethod = payments
+                .filter((p) => p.payment_method === method && !p.deleted_at)
+                .reduce((acc, p) => acc + p.amount, 0);
+              const countMethod = payments.filter((p) => p.payment_method === method && !p.deleted_at).length;
 
               return (
-                <div key={method} className="bg-secondary/40 p-3 rounded-xl border border-border/70">
-                  <span className="block text-[10px] uppercase font-bold text-muted-foreground">
+                <div key={method} className="bg-secondary/40 p-3 rounded-xl border border-border/40">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">
                     {method.replace('_', ' ')}
                   </span>
                   <p className="text-sm font-bold text-foreground mt-1">
@@ -290,6 +317,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
             {stats.expiringIn7Days > 0 && (
               <span className={`px-1.5 py-0.2 rounded font-bold text-[10px] ${activeTab === 'expiring' ? 'bg-[#1E1F22] text-[#F0B232]' : 'bg-[#F0B232]/20 text-[#F0B232]'}`}>
                 {stats.expiringIn7Days}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('expired')}
+            className={`px-3.5 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-2 cursor-pointer ${
+              activeTab === 'expired'
+                ? 'bg-[#5865F2] text-white shadow-sm'
+                : 'bg-[#1E1F22] text-[#949BA4] hover:text-[#DBDEE1] hover:bg-[#35373C]'
+            }`}
+          >
+            <AlertCircle className="h-3.5 w-3.5 text-rose-400" />
+            <span>Expired Members</span>
+            {stats.expiredCount > 0 && (
+              <span className={`px-1.5 py-0.2 rounded font-bold text-[10px] ${activeTab === 'expired' ? 'bg-[#1E1F22] text-[#DA373C]' : 'bg-[#DA373C]/20 text-[#DA373C]'}`}>
+                {stats.expiredCount}
               </span>
             )}
           </button>
@@ -338,13 +382,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
 
         {/* Tab Content */}
         <div className="p-4 sm:p-5">
-          {/* TAB 1: EXPIRING SOON & EXPIRED */}
+          {/* TAB 1: EXPIRING SOON (< 7 DAYS) */}
           {activeTab === 'expiring' && (
             <div>
-              {expiringOrExpired.length === 0 ? (
+              {expiringSoonList.length === 0 ? (
                 <EmptyState
                   icon={<Clock className="h-6 w-6" />}
-                  title="No Expiring or Expired Members"
+                  title="No Members Expiring Soon"
                   description="All active members have more than 7 days remaining on their current plans."
                 />
               ) : (
@@ -355,12 +399,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
                         <TableHead>Member</TableHead>
                         <TableHead>Current Plan</TableHead>
                         <TableHead>Expiry Date</TableHead>
-                        <TableHead>Status / Remaining</TableHead>
+                        <TableHead>Days Left</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </tr>
                     </TableHeader>
                     <TableBody>
-                      {expiringOrExpired.map((member: EnrichedMember) => (
+                      {expiringSoonList.map((member: EnrichedMember) => (
                         <TableRow key={member.id}>
                           <TableCell>
                             <div>
@@ -378,14 +422,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
                           <TableCell className="font-medium text-xs">{member.current_plan?.name || 'Standard'}</TableCell>
                           <TableCell className="text-xs font-mono">{member.current_membership?.end_date || '—'}</TableCell>
                           <TableCell>
-                            <Badge
-                              variant={member.timing_status === 'expired' || member.days_remaining < 0 ? 'expired' : 'expiring'}
-                              size="sm"
-                              dot
-                            >
-                              {member.days_remaining < 0
-                                ? `Expired (${Math.abs(member.days_remaining)}d ago)`
-                                : member.days_remaining === 0
+                            <Badge variant={member.days_remaining <= 2 ? 'expired' : 'expiring'} size="sm" dot>
+                              {member.days_remaining === 0
                                 ? 'Expires Today'
                                 : `${member.days_remaining} day${member.days_remaining === 1 ? '' : 's'} left`}
                             </Badge>
@@ -405,7 +443,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
                                 size="xs"
                                 onClick={() => setSelectedMemberForRenew(member)}
                               >
-                                {member.timing_status === 'expired' ? 'Pay / Renew' : 'Renew'}
+                                Renew
                               </Button>
                             </div>
                           </TableCell>
@@ -418,7 +456,79 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
             </div>
           )}
 
-          {/* TAB 2: UNPAID MEMBERS */}
+          {/* TAB 2: EXPIRED MEMBERS (< 0 DAYS) */}
+          {activeTab === 'expired' && (
+            <div>
+              {expiredList.length === 0 ? (
+                <EmptyState
+                  icon={<AlertCircle className="h-6 w-6 text-emerald-500" />}
+                  title="No Expired Members"
+                  description="All registered member subscriptions are currently active and valid."
+                />
+              ) : (
+                <div className="space-y-3">
+                  <Table>
+                    <TableHeader>
+                      <tr>
+                        <TableHead>Member</TableHead>
+                        <TableHead>Previous Plan</TableHead>
+                        <TableHead>Expired On</TableHead>
+                        <TableHead>Overdue Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </tr>
+                    </TableHeader>
+                    <TableBody>
+                      {expiredList.map((member: EnrichedMember) => (
+                        <TableRow key={member.id}>
+                          <TableCell>
+                            <div>
+                              <button
+                                onClick={() => onSelectMemberDetail(member.id)}
+                                className="font-semibold text-foreground hover:text-emerald-500 transition-colors text-left"
+                              >
+                                {member.full_name}
+                              </button>
+                              <p className="text-[11px] font-mono text-muted-foreground">
+                                {member.member_code} • {member.phone}
+                              </p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-medium text-xs">{member.current_plan?.name || 'Standard'}</TableCell>
+                          <TableCell className="text-xs font-mono">{member.current_membership?.end_date || '—'}</TableCell>
+                          <TableCell>
+                            <Badge variant="expired" size="sm" dot>
+                              Expired ({Math.abs(member.days_remaining)}d ago)
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <a
+                                href={getWhatsAppShareUrl(member.id)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 font-medium transition-colors border border-emerald-500/20 cursor-pointer"
+                              >
+                                <Send className="h-3 w-3" /> WhatsApp
+                              </a>
+                              <Button
+                                variant="primary"
+                                size="xs"
+                                onClick={() => setSelectedMemberForRenew(member)}
+                              >
+                                Pay / Renew
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: UNPAID MEMBERS */}
           {activeTab === 'unpaid' && (
             <div>
               {unpaidMembers.length === 0 ? (
