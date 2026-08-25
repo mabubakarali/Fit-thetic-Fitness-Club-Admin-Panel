@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useGym } from '@/context/GymContext';
 import { StatCard } from '@/components/ui/StatCard';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -360,7 +360,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
                       </tr>
                     </TableHeader>
                     <TableBody>
-                      {expiringOrExpired.map((member) => (
+                      {expiringOrExpired.map((member: EnrichedMember) => (
                         <TableRow key={member.id}>
                           <TableCell>
                             <div>
