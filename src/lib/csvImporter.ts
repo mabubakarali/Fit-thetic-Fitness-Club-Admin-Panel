@@ -121,14 +121,38 @@ function findFieldValue(row: Record<string, any>, aliases: string[]): string {
 }
 
 /**
- * Helper to parse clean numeric currency/amounts from strings like "Rs. 3,000", "3000", "$3,000"
+ * Helper to parse clean numeric currency/amounts from strings like "Rs. 3,000", "3000", "0.3", "0.18", "$3,000"
  */
 function parseCleanAmount(rawVal?: string): number | undefined {
-  if (!rawVal) return undefined;
-  const cleaned = rawVal.replace(/[^0-9.]/g, '');
-  if (!cleaned) return undefined;
-  const num = parseFloat(cleaned);
-  return isNaN(num) || num <= 0 ? undefined : num;
+  if (rawVal === undefined || rawVal === null) return undefined;
+  let str = String(rawVal).trim();
+  if (!str) return undefined;
+
+  // Remove currency symbols & labels (Rs, PKR, $, EUR, etc.)
+  str = str.replace(/rs\.?|pkr|\$|eur|£/gi, '').trim();
+
+  // If formatted as thousands (e.g. 3,000 or 1,800 or 3.000)
+  if (/^\d{1,3}[,\.]\d{3}$/.test(str)) {
+    str = str.replace(/[,\.]/g, '');
+  } else {
+    str = str.replace(/,/g, '');
+  }
+
+  let num = parseFloat(str);
+  if (isNaN(num) || num <= 0) return undefined;
+
+  // If Excel exported in tens of thousands / fractions (e.g. 0.3 -> 3000, 0.18 -> 1800)
+  if (num < 1) {
+    num = Math.round(num * 10000);
+  }
+  // If Excel exported in thousands (e.g. 3 -> 3000, 1.8 -> 1800, 3.5 -> 3500)
+  else if (num < 50 && !Number.isInteger(num)) {
+    num = Math.round(num * 1000);
+  } else if (num <= 20 && Number.isInteger(num)) {
+    num = num * 1000;
+  }
+
+  return num;
 }
 
 /**

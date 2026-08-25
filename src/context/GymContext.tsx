@@ -225,10 +225,29 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setReminders([]);
         setSettings(seeded.gymSettings);
       } else {
+        const normalizeStoredAmount = (amt: any): number => {
+          const num = typeof amt === 'number' ? amt : parseFloat(amt);
+          if (isNaN(num) || num <= 0) return 3000;
+          if (num < 1) return Math.round(num * 10000);
+          if (num < 50 && !Number.isInteger(num)) return Math.round(num * 1000);
+          if (num <= 20 && Number.isInteger(num)) return num * 1000;
+          return num;
+        };
+
+        const healedMemberships = loadedMemberships.map((ms) => ({
+          ...ms,
+          amount: normalizeStoredAmount(ms.amount),
+        }));
+
+        const healedPayments = loadedPayments.map((p) => ({
+          ...p,
+          amount: normalizeStoredAmount(p.amount),
+        }));
+
         setMembers(loadedMembers);
         setPlans(loadedPlans.length > 0 ? loadedPlans : SEED_MEMBERSHIP_PLANS);
-        setMemberships(loadedMemberships);
-        setPayments(loadedPayments);
+        setMemberships(healedMemberships);
+        setPayments(healedPayments);
         setReceipts(loadedReceipts);
         setReminders(loadedReminders);
 
