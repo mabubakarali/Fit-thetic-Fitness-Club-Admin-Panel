@@ -118,7 +118,9 @@ interface GymContextType {
 
   importMembersBatch: (
     batchMembers: Member[],
-    batchMemberships: Membership[]
+    batchMemberships: Membership[],
+    batchPayments?: Payment[],
+    batchReceipts?: Receipt[]
   ) => Promise<void>;
 
   uploadLocalDataToCloud: (targetGymId?: string) => Promise<{
@@ -1055,7 +1057,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const importMembersBatch = async (
     batchMembers: Member[],
-    batchMemberships: Membership[]
+    batchMemberships: Membership[],
+    batchPayments: Payment[] = [],
+    batchReceipts: Receipt[] = []
   ) => {
     for (const m of batchMembers) {
       await putInStore('members', m);
@@ -1065,9 +1069,23 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await putInStore('memberships', ms);
       await enqueueSync('memberships', ms.id, 'INSERT', ms);
     }
+    for (const p of batchPayments) {
+      await putInStore('payments', p);
+      await enqueueSync('payments', p.id, 'INSERT', p);
+    }
+    for (const r of batchReceipts) {
+      await putInStore('receipts', r);
+      await enqueueSync('receipts', r.id, 'INSERT', r);
+    }
 
     setMembers((prev) => [...batchMembers, ...prev]);
     setMemberships((prev) => [...batchMemberships, ...prev]);
+    if (batchPayments.length > 0) {
+      setPayments((prev) => [...batchPayments, ...prev]);
+    }
+    if (batchReceipts.length > 0) {
+      setReceipts((prev) => [...batchReceipts, ...prev]);
+    }
   };
 
   /**

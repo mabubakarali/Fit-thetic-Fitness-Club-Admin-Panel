@@ -17,11 +17,11 @@ export function exportMembersToExcelCSV(
   const currency = settings.currency || 'Rs.';
   const nowStr = format(new Date(), 'dd MMM yyyy, hh:mm a');
 
-  // 1. Format each member's data row
+  // 1. Format each member's data row (clean unformatted numbers for Excel compatibility)
   const memberRows = enrichedMembers.map((m) => {
     // Find member payments sorted newest first
     const memberPayments = allPayments
-      .filter((p) => p.member_id === m.id)
+      .filter((p) => p.member_id === m.id && !p.deleted_at)
       .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime());
 
     const lastPayment = memberPayments[0];
@@ -31,11 +31,11 @@ export function exportMembersToExcelCSV(
       'Member Code': m.member_code,
       'Full Name': m.full_name,
       'Phone Number': m.phone,
-      'Email': m.email || 'N/A',
-      'Plan Name': m.current_plan?.name || 'No Active Plan',
-      'Plan Price': m.current_plan?.price ? `${currency} ${m.current_plan.price.toLocaleString()}` : 'N/A',
-      'Membership Valid From': m.current_membership?.start_date || 'N/A',
-      'Membership Valid Till': m.current_membership?.end_date || 'N/A',
+      'Email': m.email || '',
+      'Plan Name': m.current_plan?.name || 'Monthly Standard',
+      'Plan Price': m.current_plan?.price || (m.current_membership?.amount || 3000),
+      'Membership Valid From': m.current_membership?.start_date || '',
+      'Membership Valid Till': m.current_membership?.end_date || '',
       'Status':
         m.timing_status === 'active'
           ? 'Active'
@@ -44,47 +44,41 @@ export function exportMembersToExcelCSV(
           : m.timing_status === 'expired'
           ? 'Expired'
           : 'Inactive',
-      'Days Remaining':
-        m.days_remaining > 0
-          ? `${m.days_remaining} Days Left`
-          : m.days_remaining === 0
-          ? 'Expires Today'
-          : `${Math.abs(m.days_remaining)} Days Overdue`,
-      'Last Payment Amount': lastPayment ? `${currency} ${lastPayment.amount.toLocaleString()}` : `${currency} 0`,
-      'Last Payment Date': lastPayment ? lastPayment.payment_date : 'No Payments Recorded',
-      'Last Payment Method': lastPayment ? lastPayment.payment_method.toUpperCase() : 'N/A',
-      'Total Paid': `${currency} ${totalPaidByMember.toLocaleString()}`,
-      'Balance Due': `${currency} ${(m.balance_due || 0).toLocaleString()}`,
+      'Days Remaining': m.days_remaining,
+      'Last Payment Amount': lastPayment ? lastPayment.amount : 0,
+      'Last Payment Date': lastPayment ? lastPayment.payment_date : '',
+      'Last Payment Method': lastPayment ? lastPayment.payment_method.toUpperCase() : 'CASH',
+      'Total Paid': totalPaidByMember,
+      'Balance Due': m.balance_due || 0,
       'Registration Date': format(new Date(m.created_at), 'yyyy-MM-dd'),
     };
   });
 
   // Calculate Aggregates
-  const totalRevenue = allPayments.reduce((acc, p) => acc + (p.amount || 0), 0);
+  const totalRevenue = allPayments.filter((p) => !p.deleted_at).reduce((acc, p) => acc + (p.amount || 0), 0);
   const totalDues = enrichedMembers.reduce((acc, m) => acc + (m.balance_due || 0), 0);
   const activeCount = enrichedMembers.filter((m) => m.timing_status === 'active').length;
   const expiredCount = enrichedMembers.filter((m) => m.timing_status === 'expired').length;
   const expiringSoonCount = enrichedMembers.filter((m) => m.timing_status === 'expiring_soon').length;
 
-  // Convert members to CSV lines
-  const csvContent = Papa.unparse(memberRows);
+  // Convert members to CSV lines with explicit quoting for all string fields
+  const csvContent = Papa.unparse(memberRows, { quotes: true });
 
-  // Append comprehensive summary block at the bottom
+  // Append summary block at the bottom
   const summaryBlock = [
     '',
-    '',
-    '======================= SUMMARY & REVENUE REPORT =======================',
-    `"Gym Name","${settings.gym_name || 'Fit-Thetic Fitness Club'}"`,
-    `"Address","${settings.address || 'Royal Avenue, Islamabad'}"`,
-    `"Contact Phone","${settings.phone || '03216422429'}"`,
-    `"Report Generated Date","${nowStr}"`,
-    `"Total Registered Athletes",${enrichedMembers.length}`,
-    `"Active Members Count",${activeCount}`,
-    `"Expiring Soon Members",${expiringSoonCount}`,
-    `"Expired / Overdue Members",${expiredCount}`,
-    `"TOTAL REVENUE COLLECTED","${currency} ${totalRevenue.toLocaleString()}"`,
-    `"TOTAL OUTSTANDING DUES","${currency} ${totalDues.toLocaleString()}"`,
-    '========================================================================',
+    '# ======================= SUMMARY & REVENUE REPORT =======================',
+    `# "Gym Name": "${settings.gym_name || 'Fit-Thetic Fitness Club'}"`,
+    `# "Address": "${settings.address || 'Royal Avenue, Islamabad'}"`,
+    `# "Contact Phone": "${settings.phone || '03330538182'}"`,
+    `# "Report Generated Date": "${nowStr}"`,
+    `# "Total Registered Athletes": ${enrichedMembers.length}`,
+    `# "Active Members Count": ${activeCount}`,
+    `# "Expiring Soon Members": ${expiringSoonCount}`,
+    `# "Expired / Overdue Members": ${expiredCount}`,
+    `# "TOTAL REVENUE COLLECTED": "${currency} ${totalRevenue.toLocaleString()}"`,
+    `# "TOTAL OUTSTANDING DUES": "${currency} ${totalDues.toLocaleString()}"`,
+    '# ========================================================================',
   ].join('\r\n');
 
   const finalCsv = `${csvContent}\r\n${summaryBlock}`;

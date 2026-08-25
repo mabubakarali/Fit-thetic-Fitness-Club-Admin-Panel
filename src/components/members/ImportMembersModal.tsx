@@ -77,15 +77,20 @@ Babar Azam,03334567890,babar@gmail.com,Royal Avenue,Annual VIP,2026-08-15`;
         }
       });
 
-      const { members: newMembers, memberships: newMemberships } = prepareImportBatch(
+      const {
+        members: newMembers,
+        memberships: newMemberships,
+        payments: newPayments,
+        receipts: newReceipts,
+      } = prepareImportBatch(
         validRows,
         highestSeq + 1,
         defaultPlan,
         plans
       );
 
-      await importMembersBatch(newMembers, newMemberships);
-      showToast('Import Complete', `Successfully imported ${newMembers.length} members.`);
+      await importMembersBatch(newMembers, newMemberships, newPayments, newReceipts);
+      showToast('Import Complete', `Successfully imported ${newMembers.length} members with fee and payment records.`);
       onClose();
       setImportResult(null);
       setCsvText('');

@@ -10,9 +10,12 @@ export interface ParsedMemberRow {
   address?: string;
   emergency_contact?: string;
   plan_name?: string;
+  plan_price?: number;
   start_date?: string;
   end_date?: string;
   amount_paid?: number;
+  payment_method?: string;
+  payment_date?: string;
   is_valid: boolean;
   errors: string[];
   is_duplicate_phone: boolean;
@@ -80,17 +83,32 @@ export function normalizeDateString(rawVal?: any): string {
 
 /**
  * Intelligent Fuzzy Header Matcher:
- * Finds values from arbitrary user-designed Excel/CSV files
+ * Finds values from arbitrary user-designed Excel/CSV files with exact priority
  */
 function findFieldValue(row: Record<string, any>, aliases: string[]): string {
   const keys = Object.keys(row);
 
-  // Exact or normalized match
+  // 1. Exact normalized match first
   for (const alias of aliases) {
     const normalizedAlias = alias.toLowerCase().replace(/[^a-z0-9]/g, '');
     for (const key of keys) {
       const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (normalizedKey === normalizedAlias || normalizedKey.includes(normalizedAlias)) {
+      if (normalizedKey === normalizedAlias) {
+        const val = row[key];
+        if (val !== undefined && val !== null && String(val).trim() !== '') {
+          return String(val).trim();
+        }
+      }
+    }
+  }
+
+  // 2. Substring match only for aliases of 4+ characters
+  for (const alias of aliases) {
+    const normalizedAlias = alias.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (normalizedAlias.length < 4) continue;
+    for (const key of keys) {
+      const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (normalizedKey.includes(normalizedAlias)) {
         const val = row[key];
         if (val !== undefined && val !== null && String(val).trim() !== '') {
           return String(val).trim();
@@ -100,6 +118,17 @@ function findFieldValue(row: Record<string, any>, aliases: string[]): string {
   }
 
   return '';
+}
+
+/**
+ * Helper to parse clean numeric currency/amounts from strings like "Rs. 3,000", "3000", "$3,000"
+ */
+function parseCleanAmount(rawVal?: string): number | undefined {
+  if (!rawVal) return undefined;
+  const cleaned = rawVal.replace(/[^0-9.]/g, '');
+  if (!cleaned) return undefined;
+  const num = parseFloat(cleaned);
+  return isNaN(num) || num <= 0 ? undefined : num;
 }
 
 /**
@@ -114,6 +143,7 @@ export function parseAndValidateCSV(
     Papa.parse(csvText, {
       header: true,
       skipEmptyLines: 'greedy',
+      comments: '#', // Ignore summary lines starting with '#'
       complete: (results) => {
         const rows: ParsedMemberRow[] = [];
         const existingPhones = new Set(
@@ -124,9 +154,13 @@ export function parseAndValidateCSV(
         const detectedHeaders = results.meta.fields || [];
 
         results.data.forEach((rawRow: any, index: number) => {
-          // If row is entirely empty, ignore
+          // If row is entirely empty or is a divider/summary line, ignore
           const values = Object.values(rawRow).filter((v) => v !== undefined && String(v).trim() !== '');
           if (values.length === 0) return;
+          const firstVal = String(values[0]).trim();
+          if (firstVal.startsWith('===') || firstVal.startsWith('---') || firstVal.toLowerCase().includes('summary')) {
+            return;
+          }
 
           const errors: string[] = [];
 
@@ -140,7 +174,6 @@ export function parseAndValidateCSV(
             'athlete',
             'customer_name',
             'student_name',
-            'naam',
             'client_name',
             'member',
             'first_name',
@@ -160,7 +193,6 @@ export function parseAndValidateCSV(
             'whatsapp',
             'whatsapp_no',
             'number',
-            'rabta',
             'tel',
           ]);
 
@@ -168,17 +200,22 @@ export function parseAndValidateCSV(
           const email = findFieldValue(rawRow, ['email', 'email_address', 'e_mail', 'mail']);
 
           // 4. Address & Emergency
-          const address = findFieldValue(rawRow, ['address', 'city', 'area', 'location', 'residence', 'pata']);
-          const emergency = findFieldValue(rawRow, ['emergency_contact', 'emergency', 'guardian', 'father_name', 'relative']);
+          const address = findFieldValue(rawRow, ['address', 'city', 'area', 'location', 'residence']);
+          const emergency = findFieldValue(rawRow, ['emergency_contact', 'emergency', 'guardian', 'father_name']);
 
-          // 5. Plan & Amount
-          const planName = findFieldValue(rawRow, ['plan', 'plan_name', 'package', 'membership', 'type', 'tier', 'program']);
-          const amountRaw = findFieldValue(rawRow, ['amount', 'fee', 'price', 'paid', 'charges', 'fees', 'cost', 'total', 'pkr', 'rs']);
-          const amountPaid = amountRaw ? parseFloat(amountRaw.replace(/[^0-9.]/g, '')) : undefined;
+          // 5. Plan, Price & Payments
+          const planName = findFieldValue(rawRow, ['plan_name', 'planname', 'plan', 'package', 'membership_plan', 'membership', 'tier']);
+          const rawPlanPrice = findFieldValue(rawRow, ['plan_price', 'planprice', 'fee_amount', 'membership_fee', 'fees', 'charges']);
+          const rawPaid = findFieldValue(rawRow, ['total_paid', 'totalpaid', 'last_payment_amount', 'paid_amount', 'amount_paid', 'paid', 'amount']);
+          const rawMethod = findFieldValue(rawRow, ['last_payment_method', 'payment_method', 'paymentmethod', 'method', 'mode']) || 'CASH';
+          const rawPayDate = findFieldValue(rawRow, ['last_payment_date', 'payment_date', 'paymentdate', 'paid_date']);
+
+          const planPrice = parseCleanAmount(rawPlanPrice);
+          const amountPaid = parseCleanAmount(rawPaid);
 
           // 6. Dates
-          const startDateRaw = findFieldValue(rawRow, ['start_date', 'startdate', 'join_date', 'joining_date', 'admission_date', 'date', 'from']);
-          const endDateRaw = findFieldValue(rawRow, ['end_date', 'enddate', 'expiry_date', 'expiry', 'valid_till', 'validity', 'due_date', 'to']);
+          const startDateRaw = findFieldValue(rawRow, ['membership_valid_from', 'start_date', 'startdate', 'join_date', 'joining_date', 'admission_date', 'from']);
+          const endDateRaw = findFieldValue(rawRow, ['membership_valid_till', 'end_date', 'enddate', 'expiry_date', 'expiry', 'valid_till', 'validity', 'to']);
 
           const startDate = normalizeDateString(startDateRaw);
           const endDate = endDateRaw ? normalizeDateString(endDateRaw) : undefined;
@@ -222,16 +259,21 @@ export function parseAndValidateCSV(
             address: address.trim() || undefined,
             emergency_contact: emergency.trim() || undefined,
             plan_name: planName.trim() || undefined,
+            plan_price: planPrice,
             start_date: startDate,
             end_date: endDate,
             amount_paid: amountPaid,
+            payment_method: rawMethod,
+            payment_date: rawPayDate ? normalizeDateString(rawPayDate) : undefined,
             is_valid: errors.length === 0,
             errors,
             is_duplicate_phone: isDuplicate,
             detected_fields: {
               Name: name,
               Phone: formattedPhone,
-              Plan: planName || 'Default Standard',
+              Plan: planName || 'Monthly Standard',
+              Fee: planPrice ? `Rs. ${planPrice.toLocaleString()}` : 'Default',
+              Paid: amountPaid ? `Rs. ${amountPaid.toLocaleString()}` : 'Rs. 0',
               Start: startDate,
               End: endDate || 'Calculated',
             },
@@ -262,9 +304,16 @@ export function prepareImportBatch(
   startingCodeNum: number,
   defaultPlan: MembershipPlan,
   allPlans: MembershipPlan[]
-): { members: Member[]; memberships: Membership[] } {
+): {
+  members: Member[];
+  memberships: Membership[];
+  payments: any[];
+  receipts: any[];
+} {
   const members: Member[] = [];
   const memberships: Membership[] = [];
+  const payments: any[] = [];
+  const receipts: any[] = [];
   const nowIso = new Date().toISOString();
 
   validRows.forEach((row, idx) => {
@@ -289,6 +338,8 @@ export function prepareImportBatch(
       row.end_date ||
       format(addDays(new Date(startDate), assignedPlan.duration_days), 'yyyy-MM-dd');
 
+    const planPrice = row.plan_price || row.amount_paid || assignedPlan.price || 3000;
+
     const member: Member = {
       id: memberId,
       member_code: memberCode,
@@ -303,22 +354,55 @@ export function prepareImportBatch(
       updated_at: nowIso,
     };
 
+    const membershipId = `mship_imp_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 4)}`;
+
     const membership: Membership = {
-      id: `mship_imp_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 4)}`,
+      id: membershipId,
       member_id: memberId,
       plan_id: assignedPlan.id,
       start_date: startDate,
       end_date: endDate,
-      amount: row.amount_paid !== undefined ? row.amount_paid : assignedPlan.price,
+      amount: planPrice,
       status: new Date(endDate) < new Date() ? 'expired' : 'active',
       notes: `Imported via Smart Excel Import (${assignedPlan.name})`,
       created_at: nowIso,
       updated_at: nowIso,
     };
 
+    // If amount_paid was provided (e.g. 3000), record payment and receipt
+    if (row.amount_paid !== undefined && row.amount_paid > 0) {
+      const paymentId = `pay_imp_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 4)}`;
+      const validMethods = ['cash', 'easypaisa', 'jazzcash', 'bank_transfer'];
+      const rawM = (row.payment_method || 'cash').toLowerCase().replace(/[^a-z_]/g, '');
+      const method = validMethods.includes(rawM) ? rawM : 'cash';
+
+      const payment = {
+        id: paymentId,
+        member_id: memberId,
+        membership_id: membershipId,
+        amount: row.amount_paid,
+        payment_method: method,
+        payment_date: row.payment_date || startDate,
+        notes: `Imported payment record`,
+        created_at: nowIso,
+        updated_at: nowIso,
+      };
+
+      const receipt = {
+        id: `rcpt_imp_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 4)}`,
+        payment_id: paymentId,
+        receipt_number: `FT-${format(new Date(), 'yyyyMMdd')}-${String(startingCodeNum + idx).padStart(4, '0')}`,
+        generated_at: nowIso,
+        created_at: nowIso,
+      };
+
+      payments.push(payment);
+      receipts.push(receipt);
+    }
+
     members.push(member);
     memberships.push(membership);
   });
 
-  return { members, memberships };
+  return { members, memberships, payments, receipts };
 }
