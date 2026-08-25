@@ -46,8 +46,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'members',
       label: 'Members',
       icon: <Users className="h-4 w-4" />,
-      badge: stats.totalActiveMembers,
-      badgeColor: 'bg-[#5865F2] text-white',
+      badge: stats.allRegisteredMembers,
+      badgeColor: 'bg-[#5865F2] text-white font-bold',
     },
     {
       id: 'payments',

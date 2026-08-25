@@ -486,7 +486,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         !m.deleted_at &&
         (m.timing_status === 'active' || m.timing_status === 'expiring_soon')
     ).length;
-    const allRegistered = members.filter((m) => m.status === 'active' && !m.deleted_at).length;
+    const allRegistered = members.filter((m) => !m.deleted_at).length;
     const expiring7 = expiringMembers.length;
     const expired = expiredMembers.length;
     const unpaid = unpaidMembers.length;

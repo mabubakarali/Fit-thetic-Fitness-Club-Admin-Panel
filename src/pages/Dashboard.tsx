@@ -141,9 +141,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
       {/* KPI Stats Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard
-          title="Active Members"
-          value={stats.validActiveMembers}
-          subtitle={`${stats.allRegisteredMembers} total registered`}
+          title="Total Members"
+          value={stats.allRegisteredMembers}
+          subtitle={`${stats.validActiveMembers} Active • ${stats.expiredCount} Expired`}
           icon={<Users className="h-5 w-5" />}
           variant="emerald"
           onClick={() => onNavigateTab('members')}
