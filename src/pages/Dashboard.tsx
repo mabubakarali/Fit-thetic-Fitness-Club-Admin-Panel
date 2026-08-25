@@ -39,6 +39,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
     expiringMembers,
     unpaidMembers,
     enrichedPayments,
+    payments,
     stats,
     settings,
     enrichedReceipts,
