@@ -169,27 +169,48 @@ export async function processSyncQueue(): Promise<{
   let lastErrorMsg = '';
 
   const apiUrl = getApiUrl();
-  let token = getAuthToken();
+  
+  // Helper to ensure valid, non-expired JWT token
+  const getOrRefreshToken = async (): Promise<string | null> => {
+    let currentTok = getAuthToken();
+    let isExpired = false;
 
-  // If token is missing, attempt auto-login with default credentials
-  if (!token) {
-    try {
-      const loginRes = await fetch(`${apiUrl}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'dawood@gmail.com', password: '1234' }),
-      });
-      if (loginRes.ok) {
-        const loginData = await loginRes.json();
-        if (loginData.token) {
-          token = loginData.token;
-          setAuthToken(token);
+    if (currentTok) {
+      try {
+        const parts = currentTok.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]));
+          if (payload.exp && payload.exp * 1000 < Date.now() + 60000) {
+            isExpired = true;
+          }
         }
+      } catch {
+        isExpired = true;
       }
-    } catch {
-      // Backend not reachable
     }
-  }
+
+    if (!currentTok || isExpired) {
+      try {
+        const loginRes = await fetch(`${apiUrl}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'dawood@gmail.com', password: '1234' }),
+        });
+        if (loginRes.ok) {
+          const loginData = await loginRes.json();
+          if (loginData.token) {
+            currentTok = loginData.token;
+            setAuthToken(currentTok);
+          }
+        }
+      } catch {
+        // Backend not reachable
+      }
+    }
+    return currentTok;
+  };
+
+  let token = await getOrRefreshToken();
 
   try {
     const db = await getDB();
@@ -200,16 +221,30 @@ export async function processSyncQueue(): Promise<{
     const queue = await db.getAllFromIndex('sync_queue', 'by-timestamp');
     const pendingItems = queue.filter((i) => i.status === 'pending' || i.status === 'failed');
 
-    if (pendingItems.length > 0 && token) {
+    if (pendingItems.length > 0) {
       try {
-        const pushRes = await fetch(`${apiUrl}/api/sync/push`, {
+        let pushRes = await fetch(`${apiUrl}/api/sync/push`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           body: JSON.stringify({ items: pendingItems }),
         });
+
+        // If 401 Unauthorized, refresh token and retry immediately
+        if (pushRes.status === 401) {
+          setAuthToken(null);
+          token = await getOrRefreshToken();
+          pushRes = await fetch(`${apiUrl}/api/sync/push`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ items: pendingItems }),
+          });
+        }
 
         if (pushRes.ok) {
           const pushData = await pushRes.json();
@@ -235,17 +270,27 @@ export async function processSyncQueue(): Promise<{
     // =========================================================================
     // 2. PULL PHASE: Incremental pull from cloud
     // =========================================================================
-    if (token) {
-      try {
-        const lastSynced = localStorage.getItem('fit_thetic_last_synced') || '';
-        const pullRes = await fetch(`${apiUrl}/api/sync/pull?since=${encodeURIComponent(lastSynced)}`, {
+    try {
+      const lastSynced = localStorage.getItem('fit_thetic_last_synced') || '';
+      let pullRes = await fetch(`${apiUrl}/api/sync/pull?since=${encodeURIComponent(lastSynced)}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      // If 401 Unauthorized, refresh token and retry immediately
+      if (pullRes.status === 401) {
+        setAuthToken(null);
+        token = await getOrRefreshToken();
+        pullRes = await fetch(`${apiUrl}/api/sync/pull?since=${encodeURIComponent(lastSynced)}`, {
           headers: {
-            Authorization: `Bearer ${token}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
         });
+      }
 
-        if (pullRes.ok) {
-          const { data, timestamp } = await pullRes.json();
+      if (pullRes.ok) {
+        const { data, timestamp } = await pullRes.json();
           if (data) {
             // 2a. Membership Plans
             if (data.membership_plans && Array.isArray(data.membership_plans)) {
