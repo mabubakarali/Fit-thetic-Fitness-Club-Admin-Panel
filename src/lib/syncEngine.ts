@@ -394,7 +394,6 @@ export async function processSyncQueue(): Promise<{
       } catch (pullErr: any) {
         console.warn('Pull error:', pullErr);
       }
-    }
 
     currentState.is_syncing = false;
     currentState.error = errors > 0 ? lastErrorMsg : null;
