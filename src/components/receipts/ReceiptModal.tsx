@@ -49,6 +49,8 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt: rawReceipt,
       ? format(new Date(receipt.payment.payment_date), 'dd/MM/yyyy') 
       : format(new Date(), 'dd/MM/yyyy');
 
+    const footerNote = settings.receipt_footer || 'Fees is not refundable nor transferable.';
+
     return (
       `*FIT-THETIC FITNESS CLUB — OFFICIAL PAYMENT RECEIPT* 🧾\n` +
       `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -61,12 +63,13 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt: rawReceipt,
       `*Amount Paid:* Rs. ${(receipt.payment?.amount || 0).toLocaleString()} (${(receipt.payment?.payment_method || 'cash').toUpperCase()})\n` +
       `${receipt.payment?.transaction_reference ? `*Ref / Trx:* ${receipt.payment.transaction_reference}\n` : ''}` +
       `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `*Note:* ${footerNote}\n` +
       `_Thank you for training with Fit-Thetic Fitness Club!_\n` +
-      `*Dawood Janjua (Owner / Head Trainer)*\n` +
-      `Royal Avenue, Meherban Colony, Chak Shahzad, Isb\n` +
-      `Ph: 03216422429`
+      `*${settings.owner_name || 'Dawood Janjua'} (Owner / Head Trainer)*\n` +
+      `${settings.address || 'Royal Avenue, Meherban Colony, Chak Shahzad, Isb'}\n` +
+      `Ph: ${settings.phone || '03330538182'}`
     );
-  }, [receipt]);
+  }, [receipt, settings]);
 
   const whatsappUrl = useMemo(() => {
     return `https://wa.me/${formattedPhone}?text=${encodeURIComponent(whatsappMessage)}`;
@@ -340,9 +343,9 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt: rawReceipt,
               <div className="pt-2 space-y-2 text-[10px] text-slate-600">
                 <div className="pt-3 flex justify-between items-end border-b border-slate-300 pb-1">
                   <span>Authorized Signature:</span>
-                  <span className="font-serif italic font-bold text-black">Dawood Janjua</span>
+                  <span className="font-serif italic font-bold text-black">{settings.owner_name || 'Dawood Janjua'}</span>
                 </div>
-                <p className="text-[9px] leading-tight italic">{settings.receipt_footer}</p>
+                <p className="text-[9px] leading-tight font-semibold text-slate-800">{settings.receipt_footer || 'Fees is not refundable nor transferable.'}</p>
                 <p className="text-[9px] text-slate-400">Printed: {format(new Date(), 'dd/MM/yyyy HH:mm')}</p>
               </div>
             </div>
@@ -421,10 +424,10 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt: rawReceipt,
               <div className="flex justify-between items-end pt-4 border-t border-slate-200 text-xs text-slate-500">
                 <div className="max-w-md space-y-1">
                   <p className="font-semibold text-slate-700">Terms & Conditions:</p>
-                  <p className="text-[11px] leading-relaxed">{settings.receipt_footer}</p>
+                  <p className="text-[11px] leading-relaxed font-semibold text-slate-700">{settings.receipt_footer || 'Fees is not refundable nor transferable.'}</p>
                 </div>
                 <div className="text-center">
-                  <div className="w-36 border-b border-slate-400 pb-1 font-serif italic text-slate-800 font-bold">Dawood Janjua</div>
+                  <div className="w-36 border-b border-slate-400 pb-1 font-serif italic text-slate-800 font-bold">{settings.owner_name || 'Dawood Janjua'}</div>
                   <span className="text-[10px] text-slate-400">Head Trainer / Owner</span>
                 </div>
               </div>

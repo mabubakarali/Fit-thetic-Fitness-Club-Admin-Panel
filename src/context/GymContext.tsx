@@ -253,10 +253,23 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         const currentSettings = loadedSettings[0];
         if (!currentSettings) {
-          const updatedSettings = { ...SEED_GYM_SETTINGS, id: 'sett-001', gym_id: activeGymId };
+          const updatedSettings = {
+            ...SEED_GYM_SETTINGS,
+            id: 'sett-001',
+            gym_id: activeGymId,
+            receipt_footer: 'Fees are not refundable nor transferable.',
+          };
           await putInStore('gym_settings', updatedSettings);
           setSettings(updatedSettings);
         } else {
+          if (
+            !currentSettings.receipt_footer ||
+            currentSettings.receipt_footer.includes('Registration & fees are non-refundable')
+          ) {
+            currentSettings.receipt_footer = 'Fees are not refundable nor transferable.';
+            await putInStore('gym_settings', currentSettings);
+            await enqueueSync('gym_settings', currentSettings.id || 'sett-001', 'UPDATE', currentSettings);
+          }
           setSettings(currentSettings);
         }
       }

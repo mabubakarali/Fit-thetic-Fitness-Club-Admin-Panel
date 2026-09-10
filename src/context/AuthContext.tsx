@@ -9,7 +9,7 @@ export const FIT_THETIC_GYM: Gym = {
   email: 'dawood@gmail.com',
   address: 'Royal Avenue, Meherban Colony, Chak Shahzad, Isb',
   currency: 'Rs.',
-  receipt_footer: 'Thank you for choosing Fit-thetic Fitness Club! Registration & fees are non-refundable.',
+  receipt_footer: 'Fees are not refundable nor transferable.',
   whatsapp_reminders_enabled: true,
   reminder_settings: {
     d7: true,
