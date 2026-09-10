@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fit-thetic-cache-v3';
+const CACHE_NAME = 'fit-thetic-cache-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -37,29 +37,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Stale-while-revalidate / Cache-first with Network Fallback
+  // Network-First with Cache Fallback for instant updates
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request)
-        .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            const responseClone = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseClone);
-            });
-          }
-          return networkResponse;
-        })
-        .catch(() => {
-          // If offline and navigating to any route (e.g. /login, /members), return cached index.html
+    fetch(event.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseClone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseClone);
+          });
+        }
+        return networkResponse;
+      })
+      .catch(() => {
+        return caches.match(event.request).then((cachedResponse) => {
+          if (cachedResponse) return cachedResponse;
           if (event.request.mode === 'navigate') {
             return caches.match('/index.html') || caches.match('/');
           }
-          return cachedResponse;
+          return new Response('Offline', { status: 503, statusText: 'Offline' });
         });
-
-      // If cached response exists, return it immediately; otherwise wait for fetch
-      return cachedResponse || fetchPromise;
-    })
+      })
   );
 });
