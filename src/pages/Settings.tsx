@@ -670,6 +670,42 @@ export const Settings: React.FC = () => {
 
         <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-border/60">
           <div>
+            <p className="text-xs font-semibold text-emerald-400">Update App & Clear Mobile Cache</p>
+            <p className="text-[11px] text-muted-foreground">Force-clears cached scripts on phones/tablets to immediately load the latest features</p>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            leftIcon={<RefreshCw className="h-3.5 w-3.5 text-emerald-400" />}
+            onClick={async () => {
+              try {
+                if ('serviceWorker' in navigator) {
+                  const registrations = await navigator.serviceWorker.getRegistrations();
+                  for (const reg of registrations) {
+                    await reg.unregister();
+                  }
+                }
+                if ('caches' in window) {
+                  const keys = await caches.keys();
+                  for (const k of keys) {
+                    await caches.delete(k);
+                  }
+                }
+                showToast('App Cache Cleared', 'Reloading latest version from cloud...', 'success');
+                setTimeout(() => {
+                  window.location.reload();
+                }, 600);
+              } catch {
+                window.location.reload();
+              }
+            }}
+          >
+            Update App & Refresh
+          </Button>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-border/60">
+          <div>
             <p className="text-xs font-semibold text-rose-400">Initialize / Reset Database</p>
             <p className="text-[11px] text-muted-foreground">Clear all local modifications and restore a fresh database</p>
           </div>
