@@ -1009,22 +1009,34 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { reminder: existing, alreadyExisted: true };
     }
 
-    const gymName = settings.gym_name || 'Fit-thetic Gym';
+    const gymName = settings.gym_name || 'Fit-thetic Fitness Club';
+    const ownerName = settings.owner_name || 'Dawood Janjua';
+    const currency = settings.currency || 'Rs.';
     const nowIso = new Date().toISOString();
 
-    const daysLeft = differenceInDays(new Date(membership.end_date), new Date());
-    let message = '';
+    const footerNote = (settings.receipt_footer && !settings.receipt_footer.includes('Registration & fees are non-refundable'))
+      ? settings.receipt_footer
+      : 'Fees is not refundable nor transferable.';
 
-    if (reminderType === '7_days_before') {
-      message = `Hi ${member.full_name}, your gym membership at ${gymName} is expiring in 7 days (on ${membership.end_date}). Renew now to stay on track!`;
-    } else if (reminderType === '3_days_before') {
-      message = `Reminder: Hi ${member.full_name}, 3 days left on your ${gymName} membership. Visit front desk to renew!`;
-    } else if (reminderType === '1_day_before') {
-      message = `Urgent: Hi ${member.full_name}, your membership at ${gymName} expires tomorrow (${membership.end_date}).`;
-    } else if (reminderType === 'on_expiry') {
-      message = `Hi ${member.full_name}, your membership at ${gymName} expired today. Please renew your membership to continue working out.`;
+    const enriched = enrichedMembers.find((m) => m.id === memberId);
+    const planName = enriched?.current_plan?.name || 'Membership Plan';
+    const planPrice = enriched?.current_plan?.price || (membership?.amount || 3000);
+    const pastDue = enriched?.balance_due || 0;
+    const totalWithRenewal = pastDue + planPrice;
+
+    let message = '';
+    if (reminderType === 'on_expiry') {
+      if (pastDue > 0) {
+        message = `Hi ${member.full_name}, your gym membership at ${gymName} expired on ${membership.end_date}. Previous dues: ${currency} ${pastDue.toLocaleString()}, renewal (${planName}): ${currency} ${planPrice.toLocaleString()}, Total to continue: ${currency} ${totalWithRenewal.toLocaleString()}. Note: ${footerNote}`;
+      } else {
+        message = `Hi ${member.full_name}, your gym membership at ${gymName} expired on ${membership.end_date}. Renewal fee: ${currency} ${planPrice.toLocaleString()} (${planName}). Note: ${footerNote}`;
+      }
     } else {
-      message = `Hi ${member.full_name}, this is a notification from ${gymName} regarding your membership.`;
+      if (pastDue > 0) {
+        message = `Hi ${member.full_name}, your gym membership at ${gymName} expires on ${membership.end_date}. Pending dues: ${currency} ${pastDue.toLocaleString()}, next renewal: ${currency} ${planPrice.toLocaleString()}, Total: ${currency} ${totalWithRenewal.toLocaleString()}. Note: ${footerNote}`;
+      } else {
+        message = `Hi ${member.full_name}, your gym membership at ${gymName} expires on ${membership.end_date}. Renewal fee: ${currency} ${planPrice.toLocaleString()} (${planName}). Note: ${footerNote}`;
+      }
     }
 
     const newReminder: WhatsAppReminder = {
@@ -1063,6 +1075,11 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const gymName = settings.gym_name || 'Fit-thetic Fitness Club';
     const ownerName = settings.owner_name || 'Dawood Janjua';
     const currency = settings.currency || 'Rs.';
+    const phoneContact = settings.phone || '03330538182';
+
+    const footerNote = (settings.receipt_footer && !settings.receipt_footer.includes('Registration & fees are non-refundable'))
+      ? settings.receipt_footer
+      : 'Fees is not refundable nor transferable.';
 
     const cleanPhone = member.phone.replace(/[^0-9]/g, '');
     const phoneFormatted = cleanPhone.startsWith('92')
@@ -1072,16 +1089,29 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       : `92${cleanPhone}`;
 
     const enriched = enrichedMembers.find((m) => m.id === memberId);
+    const planName = enriched?.current_plan?.name || 'Membership Plan';
+    const planPrice = enriched?.current_plan?.price || (membership?.amount || 3000);
+    const pastDue = enriched?.balance_due || 0;
+    const totalWithRenewal = pastDue + planPrice;
 
     let message = '';
+
     if (enriched?.timing_status === 'expired') {
-      message = `Hi ${member.full_name},\n\nYour gym membership at *${gymName}* expired on *${membership?.end_date || 'recently'}*.\n\nPlease renew your membership fee (${currency} ${(enriched.current_plan?.price || 3000).toLocaleString()}) to continue your workout sessions.\n\nThank you,\n*${ownerName}*\n${gymName}`;
+      if (pastDue > 0) {
+        message = `Hi ${member.full_name},\n\nYour gym membership at *${gymName}* expired on *${membership?.end_date || 'recently'}*.\n\n• Previous Outstanding Dues: *${currency} ${pastDue.toLocaleString()}*\n• Next Month Renewal Fee (${planName}): *${currency} ${planPrice.toLocaleString()}*\n• *Total Payable to Continue: ${currency} ${totalWithRenewal.toLocaleString()}*\n\nPlease clear your previous balance and renew your membership to continue your workout sessions.\n\n*Note:* ${footerNote}\n\nThank you,\n*${ownerName}*\n${gymName}\nPh: ${phoneContact}`;
+      } else {
+        message = `Hi ${member.full_name},\n\nYour gym membership at *${gymName}* expired on *${membership?.end_date || 'recently'}*.\n\nPlease renew your membership fee (*${currency} ${planPrice.toLocaleString()}* for ${planName}) to continue your workout sessions.\n\n*Note:* ${footerNote}\n\nThank you,\n*${ownerName}*\n${gymName}\nPh: ${phoneContact}`;
+      }
     } else if (enriched?.timing_status === 'expiring_soon') {
-      message = `Hi ${member.full_name},\n\nYour gym membership at *${gymName}* is expiring on *${membership?.end_date}* (${enriched.days_remaining} day${enriched.days_remaining === 1 ? '' : 's'} remaining).\n\nPlease renew in advance to maintain your fitness streak!\n\nThank you,\n*${ownerName}*\n${gymName}`;
-    } else if (enriched?.is_unpaid) {
-      message = `Hi ${member.full_name},\n\nThis is a reminder from *${gymName}* regarding an outstanding fee balance of *${currency} ${enriched.balance_due.toLocaleString()}*.\n\nPlease clear the balance at your earliest convenience.\n\nThank you,\n*${ownerName}*\n${gymName}`;
+      if (pastDue > 0) {
+        message = `Hi ${member.full_name},\n\nYour gym membership at *${gymName}* is expiring on *${membership?.end_date}* (${enriched.days_remaining} day${enriched.days_remaining === 1 ? '' : 's'} remaining).\n\n• Current Pending Balance: *${currency} ${pastDue.toLocaleString()}*\n• Next Cycle Renewal Fee (${planName}): *${currency} ${planPrice.toLocaleString()}*\n• *Total Payable: ${currency} ${totalWithRenewal.toLocaleString()}*\n\nPlease clear your pending dues and renew in advance to maintain your fitness streak!\n\n*Note:* ${footerNote}\n\nThank you,\n*${ownerName}*\n${gymName}\nPh: ${phoneContact}`;
+      } else {
+        message = `Hi ${member.full_name},\n\nYour gym membership at *${gymName}* is expiring on *${membership?.end_date}* (${enriched.days_remaining} day${enriched.days_remaining === 1 ? '' : 's'} remaining).\n\nRenewal Fee: *${currency} ${planPrice.toLocaleString()}* (${planName})\n\nPlease renew in advance to maintain your fitness streak!\n\n*Note:* ${footerNote}\n\nThank you,\n*${ownerName}*\n${gymName}\nPh: ${phoneContact}`;
+      }
+    } else if (enriched?.is_unpaid && pastDue > 0) {
+      message = `Hi ${member.full_name},\n\nThis is a friendly reminder from *${gymName}* regarding an outstanding fee balance of *${currency} ${pastDue.toLocaleString()}* for your active membership (${planName}).\n\nPlease clear the balance at your earliest convenience to keep your membership active.\n\n*Note:* ${footerNote}\n\nThank you,\n*${ownerName}*\n${gymName}\nPh: ${phoneContact}`;
     } else {
-      message = `Hi ${member.full_name},\n\nGreetings from *${gymName}*! Your membership is active until *${membership?.end_date || 'end of cycle'}*.\n\nKeep up the great workouts!\n\nBest regards,\n*${ownerName}*\n${gymName}`;
+      message = `Hi ${member.full_name},\n\nGreetings from *${gymName}*! Your membership (${planName}) is active until *${membership?.end_date || 'end of cycle'}*.\n\nKeep up the great workouts!\n\n*Note:* ${footerNote}\n\nBest regards,\n*${ownerName}*\n${gymName}\nPh: ${phoneContact}`;
     }
 
     return `https://wa.me/${phoneFormatted}?text=${encodeURIComponent(message)}`;
