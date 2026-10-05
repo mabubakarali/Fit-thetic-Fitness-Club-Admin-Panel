@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fit-thetic-cache-v6';
+const CACHE_NAME = 'fit-thetic-cache-v7';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

@@ -15,6 +15,7 @@ import {
   SyncState,
   PaymentMethod,
   ReminderType,
+  ActivityLogItem,
 } from '@/types/database';
 import {
   getNonDeletedFromStore,
@@ -52,6 +53,7 @@ interface GymContextType {
   expiredMembers: EnrichedMember[];
   enrichedPayments: EnrichedPayment[];
   enrichedReceipts: EnrichedReceipt[];
+  activityLog: ActivityLogItem[];
 
   // Real-time KPI statistics
   stats: {
@@ -87,6 +89,7 @@ interface GymContextType {
     amountOverride?: number,
     immediatePayment?: { method: PaymentMethod; amount?: number; ref?: string; notes?: string }
   ) => Promise<{ membership: Membership; receipt?: Receipt; enrichedReceipt?: EnrichedReceipt }>;
+  deleteMembership: (membershipId: string) => Promise<void>;
 
   recordPayment: (
     memberId: string,
@@ -97,6 +100,7 @@ interface GymContextType {
     reference?: string,
     notes?: string
   ) => Promise<{ payment: Payment; receipt: Receipt; enrichedReceipt: EnrichedReceipt }>;
+  deletePayment: (paymentId: string) => Promise<void>;
 
   addPlan: (plan: Omit<MembershipPlan, 'id' | 'created_at' | 'updated_at'>) => Promise<MembershipPlan>;
   updatePlan: (id: string, updates: Partial<MembershipPlan>) => Promise<void>;
@@ -553,6 +557,140 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [members, enrichedMembers, expiringMembers, expiredMembers, unpaidMembers, payments]);
 
+  const activityLog: ActivityLogItem[] = useMemo(() => {
+    const items: ActivityLogItem[] = [];
+
+    // 1. Payments (both active and voided)
+    payments.forEach((p) => {
+      const member = members.find((m) => m.id === p.member_id);
+      const membership = memberships.find((ms) => ms.id === p.membership_id);
+      const plan = membership ? plans.find((pl) => pl.id === membership.plan_id) : undefined;
+      const receipt = receipts.find((r) => r.payment_id === p.id);
+
+      const memberName = member?.full_name || 'Member';
+      const memberCode = member?.member_code || '';
+      const currency = settings.currency || 'Rs.';
+      const amountFormatted = `${currency} ${p.amount.toLocaleString()}`;
+      const methodLabel = p.payment_method.replace('_', ' ').toUpperCase();
+
+      if (p.deleted_at) {
+        items.push({
+          id: `void-${p.id}`,
+          type: 'payment_voided',
+          timestamp: p.deleted_at,
+          title: `Voided Payment: ${amountFormatted}`,
+          description: `Payment of ${amountFormatted} (${methodLabel}) for ${memberName} (${memberCode}) was cancelled/undone.`,
+          memberId: p.member_id,
+          memberName,
+          memberCode,
+          amount: p.amount,
+          paymentMethod: p.payment_method,
+          planName: plan?.name,
+          receiptNumber: receipt?.receipt_number,
+          paymentId: p.id,
+          membershipId: p.membership_id,
+          isReversible: false,
+          isVoided: true,
+          deviceId: p.deleted_by || p.updated_by,
+        });
+      } else {
+        items.push({
+          id: `pay-${p.id}`,
+          type: 'payment_recorded',
+          timestamp: p.created_at || p.payment_date,
+          title: `Payment Received: ${amountFormatted}`,
+          description: `Received ${amountFormatted} via ${methodLabel} from ${memberName} (${memberCode})${receipt?.receipt_number ? ` — Receipt #${receipt.receipt_number}` : ''}.`,
+          memberId: p.member_id,
+          memberName,
+          memberCode,
+          amount: p.amount,
+          paymentMethod: p.payment_method,
+          planName: plan?.name,
+          receiptNumber: receipt?.receipt_number,
+          paymentId: p.id,
+          membershipId: p.membership_id,
+          isReversible: true,
+          isVoided: false,
+          deviceId: p.updated_by,
+        });
+      }
+    });
+
+    // 2. Memberships / Renewals
+    memberships.forEach((ms) => {
+      const member = members.find((m) => m.id === ms.member_id);
+      const plan = plans.find((pl) => pl.id === ms.plan_id);
+      const memberName = member?.full_name || 'Member';
+      const memberCode = member?.member_code || '';
+      const planName = plan?.name || 'Membership Plan';
+      const currency = settings.currency || 'Rs.';
+
+      if (ms.deleted_at) {
+        items.push({
+          id: `void-ms-${ms.id}`,
+          type: 'membership_voided',
+          timestamp: ms.deleted_at,
+          title: `Cancelled Membership / Renewal: ${planName}`,
+          description: `Membership (${planName}) for ${memberName} (${memberCode}) was removed/undone.`,
+          memberId: ms.member_id,
+          memberName,
+          memberCode,
+          planName,
+          membershipId: ms.id,
+          isReversible: false,
+          isVoided: true,
+          deviceId: ms.deleted_by,
+        });
+      } else {
+        const allMemberMs = memberships
+          .filter((m) => m.member_id === ms.member_id && !m.deleted_at)
+          .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
+        const isRenewal = allMemberMs.length > 1 && allMemberMs[0].id !== ms.id;
+
+        if (isRenewal) {
+          items.push({
+            id: `renew-${ms.id}`,
+            type: 'membership_renewed',
+            timestamp: ms.created_at || ms.start_date,
+            title: `Membership Renewed: ${planName}`,
+            description: `Renewed ${planName} for ${memberName} (${memberCode}) valid from ${ms.start_date} to ${ms.end_date} (${currency} ${ms.amount.toLocaleString()}).`,
+            memberId: ms.member_id,
+            memberName,
+            memberCode,
+            amount: ms.amount,
+            planName,
+            membershipId: ms.id,
+            isReversible: true,
+            isVoided: false,
+            deviceId: ms.updated_by,
+          });
+        }
+      }
+    });
+
+    // 3. Member Registrations
+    members.forEach((m) => {
+      if (!m.deleted_at) {
+        items.push({
+          id: `member-${m.id}`,
+          type: 'member_registered',
+          timestamp: m.created_at,
+          title: `New Athlete Registered: ${m.full_name}`,
+          description: `Registered athlete ${m.full_name} (${m.member_code}) with phone ${m.phone}.`,
+          memberId: m.id,
+          memberName: m.full_name,
+          memberCode: m.member_code,
+          isReversible: false,
+          isVoided: false,
+          deviceId: m.updated_by,
+        });
+      }
+    });
+
+    return items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [payments, memberships, members, plans, receipts, settings]);
+
+
   // ----------------------------------------------------
   // Context Actions & Business Logic
   // ----------------------------------------------------
@@ -933,6 +1071,94 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     return { payment: newPayment, receipt: newReceipt, enrichedReceipt };
+  };
+
+  const deletePayment = async (paymentId: string) => {
+    const nowIso = new Date().toISOString();
+    const deviceId = getDeviceId();
+
+    const payment = payments.find((p) => p.id === paymentId);
+    if (!payment) return;
+
+    const tombstonedPayment: Payment = {
+      ...payment,
+      deleted_at: nowIso,
+      deleted_by: deviceId,
+      updated_by: deviceId,
+    };
+
+    await putInStore('payments', tombstonedPayment);
+    await enqueueSync('payments', paymentId, 'DELETE', tombstonedPayment);
+
+    const relatedReceipts = receipts.filter((r) => r.payment_id === paymentId);
+    for (const r of relatedReceipts) {
+      const tombstonedReceipt: Receipt = {
+        ...r,
+        deleted_at: nowIso,
+        deleted_by: deviceId,
+      };
+      await putInStore('receipts', tombstonedReceipt);
+      await enqueueSync('receipts', r.id, 'DELETE', tombstonedReceipt);
+    }
+
+    setPayments((prev) => prev.map((p) => (p.id === paymentId ? tombstonedPayment : p)));
+    setReceipts((prev) =>
+      prev.map((r) => (r.payment_id === paymentId ? { ...r, deleted_at: nowIso, deleted_by: deviceId } : r))
+    );
+
+    processSyncQueue();
+  };
+
+  const deleteMembership = async (membershipId: string) => {
+    const nowIso = new Date().toISOString();
+    const deviceId = getDeviceId();
+
+    const ms = memberships.find((m) => m.id === membershipId);
+    if (!ms) return;
+
+    const msTombstone: Membership = {
+      ...ms,
+      deleted_at: nowIso,
+      deleted_by: deviceId,
+      updated_at: nowIso,
+    };
+    await putInStore('memberships', msTombstone);
+    await enqueueSync('memberships', membershipId, 'DELETE', msTombstone);
+
+    const relatedPayments = payments.filter((p) => p.membership_id === membershipId);
+    for (const pay of relatedPayments) {
+      const payTombstone: Payment = {
+        ...pay,
+        deleted_at: nowIso,
+        deleted_by: deviceId,
+        updated_by: deviceId,
+      };
+      await putInStore('payments', payTombstone);
+      await enqueueSync('payments', pay.id, 'DELETE', payTombstone);
+
+      const relReceipts = receipts.filter((r) => r.payment_id === pay.id);
+      for (const r of relReceipts) {
+        const rTombstone: Receipt = {
+          ...r,
+          deleted_at: nowIso,
+          deleted_by: deviceId,
+        };
+        await putInStore('receipts', rTombstone);
+        await enqueueSync('receipts', r.id, 'DELETE', rTombstone);
+      }
+    }
+
+    setMemberships((prev) => prev.map((m) => (m.id === membershipId ? msTombstone : m)));
+    setPayments((prev) =>
+      prev.map((p) => (p.membership_id === membershipId ? { ...p, deleted_at: nowIso, deleted_by: deviceId } : p))
+    );
+    setReceipts((prev) =>
+      prev.map((r) =>
+        relatedPayments.some((p) => p.id === r.payment_id) ? { ...r, deleted_at: nowIso, deleted_by: deviceId } : r
+      )
+    );
+
+    processSyncQueue();
   };
 
   const addPlan = async (planData: Omit<MembershipPlan, 'id' | 'created_at' | 'updated_at'>) => {
@@ -1374,6 +1600,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         enrichedPayments,
         enrichedReceipts,
         getEnrichedReceipt,
+        activityLog,
         stats,
 
         addMember,
@@ -1381,7 +1608,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteMember,
         toggleMemberStatus,
         renewMembership,
+        deleteMembership,
         recordPayment,
+        deletePayment,
         addPlan,
         updatePlan,
         deletePlan,

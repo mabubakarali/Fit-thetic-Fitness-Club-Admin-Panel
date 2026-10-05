@@ -14,12 +14,14 @@ import {
   ShieldCheck,
   Cloud,
   CheckCircle,
-  UploadCloud
+  UploadCloud,
+  History
 } from 'lucide-react';
 
 export interface HeaderProps {
   onOpenAddMember: () => void;
   onOpenRecordPayment: () => void;
+  onOpenActivityLog?: () => void;
   onGlobalSearch?: (query: string) => void;
   onOpenMobileMenu?: () => void;
 }
@@ -27,6 +29,7 @@ export interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   onOpenAddMember,
   onOpenRecordPayment,
+  onOpenActivityLog,
   onGlobalSearch,
 }) => {
   const { syncState, forceSyncNow, settings } = useGym();
@@ -114,6 +117,18 @@ export const Header: React.FC<HeaderProps> = ({
             </>
           )}
         </button>
+
+        {/* Activity Log / History */}
+        {onOpenActivityLog && (
+          <button
+            onClick={onOpenActivityLog}
+            title="Activity Log & Undo Mistaken Transactions"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all border border-border/80 hover:border-[#5865F2] hover:bg-[#5865F2]/10 text-muted-foreground hover:text-white"
+          >
+            <History className="h-3.5 w-3.5 text-[#5865F2]" />
+            <span className="hidden md:inline">Activity Log</span>
+          </button>
+        )}
 
         {/* Quick Action: Record Payment */}
         <Button

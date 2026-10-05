@@ -7,10 +7,11 @@ import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Modal } from '@/components/ui/Modal';
 import { RecordPaymentModal } from '@/components/members/RecordPaymentModal';
 import { ReceiptModal } from '@/components/receipts/ReceiptModal';
-import { EnrichedReceipt, PaymentMethod, Receipt } from '@/types/database';
-import { CreditCard, Search, DollarSign, Receipt as ReceiptIcon, Filter, Download } from 'lucide-react';
+import { EnrichedPayment, EnrichedReceipt, PaymentMethod, Receipt } from '@/types/database';
+import { CreditCard, Search, DollarSign, Receipt as ReceiptIcon, Filter, Download, RotateCcw, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { exportPaymentsToExcelCSV } from '@/lib/exportUtils';
 
@@ -19,12 +20,14 @@ export interface PaymentsProps {
 }
 
 export const Payments: React.FC<PaymentsProps> = ({ onSelectMemberDetail }) => {
-  const { enrichedPayments, enrichedReceipts, settings } = useGym();
+  const { enrichedPayments, enrichedReceipts, deletePayment, settings } = useGym();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [methodFilter, setMethodFilter] = useState<string>('all');
   const [isRecordPayOpen, setIsRecordPayOpen] = useState(false);
   const [activeReceipt, setActiveReceipt] = useState<EnrichedReceipt | null>(null);
+  const [paymentToVoid, setPaymentToVoid] = useState<EnrichedPayment | null>(null);
+  const [isVoiding, setIsVoiding] = useState(false);
 
   const currency = settings.currency || 'Rs.';
 
@@ -202,19 +205,32 @@ export const Payments: React.FC<PaymentsProps> = ({ onSelectMemberDetail }) => {
                 </TableCell>
 
                 <TableCell className="text-right">
-                  {payment.receipt && (
+                  <div className="flex items-center justify-end gap-1.5">
+                    {payment.receipt && (
+                      <Button
+                        variant="outline"
+                        size="xs"
+                        leftIcon={<ReceiptIcon className="h-3 w-3" />}
+                        onClick={() => {
+                          const enc = enrichedReceipts.find((r) => r.id === payment.receipt?.id);
+                          if (enc) setActiveReceipt(enc);
+                        }}
+                      >
+                        Receipt
+                      </Button>
+                    )}
+
                     <Button
                       variant="outline"
                       size="xs"
-                      leftIcon={<ReceiptIcon className="h-3 w-3" />}
-                      onClick={() => {
-                        const enc = enrichedReceipts.find((r) => r.id === payment.receipt?.id);
-                        if (enc) setActiveReceipt(enc);
-                      }}
+                      leftIcon={<RotateCcw className="h-3 w-3 text-rose-400" />}
+                      onClick={() => setPaymentToVoid(payment)}
+                      className="border-rose-500/30 text-rose-400 hover:bg-rose-500/10 hover:border-rose-500"
+                      title="Undo / Void this mistaken payment"
                     >
-                      View Receipt
+                      Void
                     </Button>
-                  )}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -234,6 +250,75 @@ export const Payments: React.FC<PaymentsProps> = ({ onSelectMemberDetail }) => {
         isOpen={Boolean(activeReceipt)}
         onClose={() => setActiveReceipt(null)}
       />
+
+      {/* Void Payment Confirmation Modal */}
+      {paymentToVoid && (
+        <Modal
+          isOpen={Boolean(paymentToVoid)}
+          onClose={() => setPaymentToVoid(null)}
+          title="Confirm Void / Undo Payment"
+          description="Are you sure you want to cancel this payment? This will update revenue and restore member balance dues."
+          maxWidth="md"
+          footer={
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPaymentToVoid(null)}
+                disabled={isVoiding}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                leftIcon={<RotateCcw className="h-3.5 w-3.5" />}
+                isLoading={isVoiding}
+                onClick={async () => {
+                  if (!paymentToVoid) return;
+                  setIsVoiding(true);
+                  try {
+                    await deletePayment(paymentToVoid.id);
+                    setPaymentToVoid(null);
+                  } catch (err: any) {
+                    alert(`Failed to void payment: ${err.message || 'Unknown error'}`);
+                  } finally {
+                    setIsVoiding(false);
+                  }
+                }}
+              >
+                Confirm & Void Payment
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-3 pt-1 text-xs">
+            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-2.5 text-rose-300">
+              <AlertTriangle className="h-5 w-5 text-rose-400 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-bold">
+                  Voiding Payment of {currency} {paymentToVoid.amount.toLocaleString()}
+                </p>
+                <div className="text-[11px] text-rose-200/80 leading-relaxed">
+                  <p>• <strong>{currency} {paymentToVoid.amount.toLocaleString()}</strong> will be deducted from your total revenue.</p>
+                  {paymentToVoid.receipt && (
+                    <p>• Receipt <strong>#{paymentToVoid.receipt.receipt_number}</strong> will be voided.</p>
+                  )}
+                  {paymentToVoid.member && (
+                    <p>• <strong>{paymentToVoid.member.full_name}</strong>'s pending dues will automatically increase by {currency} {paymentToVoid.amount.toLocaleString()}.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 bg-secondary/30 rounded-xl border border-border/80 text-[11px] space-y-1">
+              <p><strong>Member:</strong> {paymentToVoid.member?.full_name} ({paymentToVoid.member?.member_code})</p>
+              <p><strong>Date:</strong> {paymentToVoid.payment_date}</p>
+              <p><strong>Method:</strong> {paymentToVoid.payment_method.replace('_', ' ').toUpperCase()}</p>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };

@@ -282,3 +282,24 @@ export interface SyncState {
   device_id: string;
   error?: string | null;
 }
+
+export interface ActivityLogItem {
+  id: string;
+  type: 'payment_recorded' | 'membership_renewed' | 'member_registered' | 'payment_voided' | 'membership_voided';
+  timestamp: string;
+  title: string;
+  description: string;
+  memberId?: string;
+  memberName?: string;
+  memberCode?: string;
+  amount?: number;
+  paymentMethod?: string;
+  planName?: string;
+  receiptNumber?: string;
+  paymentId?: string;
+  membershipId?: string;
+  isReversible?: boolean;
+  isVoided?: boolean;
+  deviceId?: string | null;
+}
+

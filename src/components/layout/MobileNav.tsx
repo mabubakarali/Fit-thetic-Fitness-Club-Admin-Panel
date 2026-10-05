@@ -10,6 +10,7 @@ import {
   Receipt,
   MessageSquare,
   Settings,
+  History,
   X
 } from 'lucide-react';
 import { useGym } from '@/context/GymContext';
@@ -17,9 +18,10 @@ import { useGym } from '@/context/GymContext';
 export interface MobileNavProps {
   currentTab: NavTab;
   onSelectTab: (tab: NavTab) => void;
+  onOpenActivityLog?: () => void;
 }
 
-export const MobileNav: React.FC<MobileNavProps> = ({ currentTab, onSelectTab }) => {
+export const MobileNav: React.FC<MobileNavProps> = ({ currentTab, onSelectTab, onOpenActivityLog }) => {
   const { stats } = useGym();
   const [showMoreDrawer, setShowMoreDrawer] = useState(false);
 
@@ -93,6 +95,21 @@ export const MobileNav: React.FC<MobileNavProps> = ({ currentTab, onSelectTab })
             </div>
 
             <div className="grid grid-cols-2 gap-3">
+              {onOpenActivityLog && (
+                <button
+                  onClick={() => {
+                    setShowMoreDrawer(false);
+                    onOpenActivityLog();
+                  }}
+                  className="flex items-center gap-3 p-3 rounded-xl border border-border/80 bg-secondary/40 text-foreground hover:bg-secondary text-left"
+                >
+                  <div className="text-[#5865F2]"><History className="h-5 w-5" /></div>
+                  <div className="flex-1 overflow-hidden">
+                    <p className="text-xs font-semibold truncate">Activity & Undo</p>
+                  </div>
+                </button>
+              )}
+
               {moreItems.map((item) => (
                 <button
                   key={item.id}

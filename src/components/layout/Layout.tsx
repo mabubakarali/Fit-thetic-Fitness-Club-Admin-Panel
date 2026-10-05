@@ -5,6 +5,7 @@ import { MobileNav } from './MobileNav';
 import { AddMemberModal } from '@/components/members/AddMemberModal';
 import { RecordPaymentModal } from '@/components/members/RecordPaymentModal';
 import { ReceiptModal } from '@/components/receipts/ReceiptModal';
+import { ActivityLogModal } from '@/components/activity/ActivityLogModal';
 import { useGym } from '@/context/GymContext';
 import { EnrichedReceipt, Receipt } from '@/types/database';
 import { WifiOff, AlertTriangle } from 'lucide-react';
@@ -14,6 +15,7 @@ export interface LayoutProps {
   onSelectTab: (tab: NavTab) => void;
   children: React.ReactNode;
   onGlobalSearch?: (query: string) => void;
+  onSelectMemberDetail?: (memberId: string) => void;
 }
 
 export const Layout: React.FC<LayoutProps> = ({
@@ -21,10 +23,12 @@ export const Layout: React.FC<LayoutProps> = ({
   onSelectTab,
   children,
   onGlobalSearch,
+  onSelectMemberDetail,
 }) => {
   const { syncState, enrichedReceipts, getEnrichedReceipt } = useGym();
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false);
+  const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [activeReceipt, setActiveReceipt] = useState<EnrichedReceipt | null>(null);
 
   const handleCreatedReceipt = (receipt?: Receipt, enriched?: EnrichedReceipt) => {
@@ -49,6 +53,7 @@ export const Layout: React.FC<LayoutProps> = ({
         <Header
           onOpenAddMember={() => setIsAddMemberOpen(true)}
           onOpenRecordPayment={() => setIsRecordPaymentOpen(true)}
+          onOpenActivityLog={() => setIsActivityLogOpen(true)}
           onGlobalSearch={onGlobalSearch}
         />
 
@@ -59,7 +64,11 @@ export const Layout: React.FC<LayoutProps> = ({
       </div>
 
       {/* Mobile Navigation */}
-      <MobileNav currentTab={currentTab} onSelectTab={onSelectTab} />
+      <MobileNav
+        currentTab={currentTab}
+        onSelectTab={onSelectTab}
+        onOpenActivityLog={() => setIsActivityLogOpen(true)}
+      />
 
       {/* Global Quick Action Modals */}
       <AddMemberModal
@@ -72,6 +81,13 @@ export const Layout: React.FC<LayoutProps> = ({
         isOpen={isRecordPaymentOpen}
         onClose={() => setIsRecordPaymentOpen(false)}
         onSuccess={handleCreatedReceipt}
+      />
+
+      {/* Activity Log & Action History Modal */}
+      <ActivityLogModal
+        isOpen={isActivityLogOpen}
+        onClose={() => setIsActivityLogOpen(false)}
+        onSelectMemberDetail={onSelectMemberDetail}
       />
 
       {/* Receipt Modal */}
