@@ -11,6 +11,8 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { RecordPaymentModal } from '@/components/members/RecordPaymentModal';
 import { RenewMembershipModal } from '@/components/members/RenewMembershipModal';
+import { FreezeMemberModal } from '@/components/members/FreezeMemberModal';
+import { UnfreezeMemberModal } from '@/components/members/UnfreezeMemberModal';
 import { ReceiptModal } from '@/components/receipts/ReceiptModal';
 import { EnrichedPayment, EnrichedReceipt, Payment, Receipt } from '@/types/database';
 import {
@@ -31,7 +33,9 @@ import {
   AlertCircle,
   AlertTriangle,
   Trash2,
-  RotateCcw
+  RotateCcw,
+  Snowflake,
+  Play
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -60,6 +64,8 @@ export const MemberDetail: React.FC<MemberDetailProps> = ({ memberId, onBack }) 
   // Modals
   const [isRecordPayOpen, setIsRecordPayOpen] = useState(false);
   const [isRenewOpen, setIsRenewOpen] = useState(false);
+  const [isFreezeModalOpen, setIsFreezeModalOpen] = useState(false);
+  const [isUnfreezeModalOpen, setIsUnfreezeModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [paymentToVoid, setPaymentToVoid] = useState<Payment | null>(null);
   const [isVoiding, setIsVoiding] = useState(false);
@@ -175,14 +181,38 @@ export const MemberDetail: React.FC<MemberDetailProps> = ({ memberId, onBack }) 
             </a>
           )}
 
-          <Button
-            variant="primary"
-            size="sm"
-            leftIcon={<RotateCw className="h-3.5 w-3.5" />}
-            onClick={() => setIsRenewOpen(true)}
-          >
-            {member.timing_status === 'expired' ? 'Renew & Pay Plan' : 'Extend / Renew Plan'}
-          </Button>
+          {member.status === 'frozen' ? (
+            <Button
+              variant="primary"
+              size="sm"
+              leftIcon={<Play className="h-4 w-4 fill-white" />}
+              onClick={() => setIsUnfreezeModalOpen(true)}
+              className="bg-[#00B0F4] hover:bg-[#009CDA] text-white"
+            >
+              Unfreeze & Start Plan
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="primary"
+                size="sm"
+                leftIcon={<RotateCw className="h-3.5 w-3.5" />}
+                onClick={() => setIsRenewOpen(true)}
+              >
+                {member.timing_status === 'expired' ? 'Renew & Pay Plan' : 'Extend / Renew Plan'}
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<Snowflake className="h-3.5 w-3.5 text-cyan-400" />}
+                onClick={() => setIsFreezeModalOpen(true)}
+                className="border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10"
+              >
+                Freeze Member
+              </Button>
+            </>
+          )}
 
           <Button
             variant="secondary"
@@ -214,6 +244,32 @@ export const MemberDetail: React.FC<MemberDetailProps> = ({ memberId, onBack }) 
         </div>
       </div>
 
+      {/* Frozen Alert Banner */}
+      {member.status === 'frozen' && (
+        <div className="p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <Snowflake className="h-5 w-5 text-cyan-400 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <h4 className="text-sm font-bold text-cyan-300">
+                Membership Currently Frozen (On Hold)
+              </h4>
+              <p className="text-xs text-cyan-200/80">
+                Reason: <strong>{member.frozen_reason || 'Temporary hold requested'}</strong>. Expiry alerts and past dues are paused. When ready, click "Unfreeze & Start Plan" to begin their fresh billing cycle.
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="primary"
+            size="xs"
+            leftIcon={<Play className="h-3.5 w-3.5 fill-white" />}
+            onClick={() => setIsUnfreezeModalOpen(true)}
+            className="bg-[#00B0F4] hover:bg-[#009CDA] text-white shrink-0"
+          >
+            Unfreeze
+          </Button>
+        </div>
+      )}
+
       {/* Main Grid: Left Column Info, Right Column History */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* ================= LEFT COLUMN: SUMMARY CARDS ================= */}
@@ -226,7 +282,9 @@ export const MemberDetail: React.FC<MemberDetailProps> = ({ memberId, onBack }) 
               </h3>
               <Badge
                 variant={
-                  member.timing_status === 'active'
+                  member.status === 'frozen'
+                    ? 'frozen'
+                    : member.timing_status === 'active'
                     ? 'active'
                     : member.timing_status === 'expiring_soon'
                     ? 'expiring'
@@ -235,7 +293,7 @@ export const MemberDetail: React.FC<MemberDetailProps> = ({ memberId, onBack }) 
                 size="sm"
                 dot
               >
-                {member.timing_status.replace('_', ' ')}
+                {member.status === 'frozen' ? 'Frozen' : member.timing_status.replace('_', ' ')}
               </Badge>
             </div>
 
@@ -578,6 +636,21 @@ export const MemberDetail: React.FC<MemberDetailProps> = ({ memberId, onBack }) 
         member={member}
         isOpen={isRenewOpen}
         onClose={() => setIsRenewOpen(false)}
+        onSuccess={handleCreatedReceipt}
+      />
+
+      {/* Freeze Member Modal */}
+      <FreezeMemberModal
+        member={member}
+        isOpen={isFreezeModalOpen}
+        onClose={() => setIsFreezeModalOpen(false)}
+      />
+
+      {/* Unfreeze Member Modal */}
+      <UnfreezeMemberModal
+        member={member}
+        isOpen={isUnfreezeModalOpen}
+        onClose={() => setIsUnfreezeModalOpen(false)}
         onSuccess={handleCreatedReceipt}
       />
 

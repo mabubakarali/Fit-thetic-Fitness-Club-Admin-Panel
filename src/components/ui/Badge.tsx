@@ -10,6 +10,7 @@ export type BadgeVariant =
   | 'cash'
   | 'online'
   | 'neutral'
+  | 'frozen'
   | 'brand';
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
@@ -35,6 +36,7 @@ export const Badge: React.FC<BadgeProps> = ({
     cash: 'bg-[#5865F2]/20 text-[#5865F2] border border-[#5865F2]/30',
     online: 'bg-[#9B59B6]/20 text-[#9B59B6] border border-[#9B59B6]/30',
     brand: 'bg-[#5865F2]/20 text-[#5865F2] border border-[#5865F2]/30',
+    frozen: 'bg-[#00B0F4]/20 text-[#00B0F4] border border-[#00B0F4]/30',
     neutral: 'bg-[#383A40] text-[#DBDEE1] border border-[#4E5058]',
   };
 
@@ -47,6 +49,7 @@ export const Badge: React.FC<BadgeProps> = ({
     cash: 'bg-[#5865F2]',
     online: 'bg-[#9B59B6]',
     brand: 'bg-[#5865F2]',
+    frozen: 'bg-[#00B0F4]',
     neutral: 'bg-[#949BA4]',
   };
 

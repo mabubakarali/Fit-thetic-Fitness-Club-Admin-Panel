@@ -1,6 +1,6 @@
 export type Gender = 'male' | 'female' | 'other';
-export type MemberStatus = 'active' | 'inactive';
-export type MembershipStatus = 'active' | 'expired' | 'cancelled';
+export type MemberStatus = 'active' | 'inactive' | 'frozen';
+export type MembershipStatus = 'active' | 'expired' | 'cancelled' | 'frozen';
 export type PaymentMethod = 'cash' | 'easypaisa' | 'jazzcash' | 'bank_transfer' | 'other';
 export type ReminderType = '7_days_before' | '3_days_before' | '1_day_before' | 'on_expiry' | 'custom';
 export type ReminderStatus = 'demo_generated' | 'sent' | 'failed';
@@ -82,6 +82,8 @@ export interface Member {
   emergency_contact?: string;
   notes?: string;
   status: MemberStatus;
+  frozen_at?: string | null;
+  frozen_reason?: string | null;
   created_at: string;
   updated_at: string;
   updated_by?: string;
@@ -179,7 +181,7 @@ export interface GymSettings {
 // Computed & Enriched View Types
 // ----------------------------------------------------
 
-export type MembershipTimingStatus = 'active' | 'expiring_soon' | 'expired';
+export type MembershipTimingStatus = 'active' | 'expiring_soon' | 'expired' | 'frozen';
 
 export interface EnrichedMember extends Member {
   current_membership?: Membership;
@@ -285,7 +287,7 @@ export interface SyncState {
 
 export interface ActivityLogItem {
   id: string;
-  type: 'payment_recorded' | 'membership_renewed' | 'member_registered' | 'payment_voided' | 'membership_voided';
+  type: 'payment_recorded' | 'membership_renewed' | 'member_registered' | 'payment_voided' | 'membership_voided' | 'member_frozen' | 'member_unfrozen';
   timestamp: string;
   title: string;
   description: string;

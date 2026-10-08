@@ -77,6 +77,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
       .filter(
         (m) =>
           m.status !== 'inactive' &&
+          m.status !== 'frozen' &&
           m.current_membership &&
           m.days_remaining >= 0 &&
           m.days_remaining <= 7
@@ -90,6 +91,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
       .filter(
         (m) =>
           m.status !== 'inactive' &&
+          m.status !== 'frozen' &&
           m.current_membership &&
           m.days_remaining < 0
       )
@@ -143,7 +145,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
         <StatCard
           title="Total Members"
           value={stats.allRegisteredMembers}
-          subtitle={`${stats.validActiveMembers} Active • ${stats.expiredCount} Expired`}
+          subtitle={`${stats.validActiveMembers} Active • ${stats.frozenCount || 0} Frozen • ${stats.expiredCount} Expired`}
           icon={<Users className="h-5 w-5" />}
           variant="emerald"
           onClick={() => onNavigateTab('members')}
@@ -226,6 +228,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
                 style={{
                   width: `${
                     stats.allRegisteredMembers > 0
+                      ? ((stats.frozenCount || 0) / stats.allRegisteredMembers) * 100
+                      : 0
+                  }%`,
+                }}
+                className="bg-[#00B0F4] transition-all"
+                title="Frozen"
+              />
+              <div
+                style={{
+                  width: `${
+                    stats.allRegisteredMembers > 0
                       ? (stats.unpaidCount / stats.allRegisteredMembers) * 100
                       : 0
                   }%`,
@@ -236,21 +249,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
             </div>
 
             {/* Legend */}
-            <div className="grid grid-cols-4 gap-1.5 text-xs text-center pt-2">
-              <div className="bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20">
-                <span className="block text-[10px] uppercase font-bold text-emerald-500">Active</span>
+            <div className="grid grid-cols-5 gap-1 text-xs text-center pt-2">
+              <div className="bg-emerald-500/10 p-1.5 rounded-lg border border-emerald-500/20">
+                <span className="block text-[9px] uppercase font-bold text-emerald-500">Active</span>
                 <span className="font-bold text-foreground">{Math.max(0, stats.validActiveMembers - stats.expiringIn7Days)}</span>
               </div>
-              <div className="bg-amber-500/10 p-2 rounded-lg border border-amber-500/20">
-                <span className="block text-[10px] uppercase font-bold text-amber-500">Expiring</span>
+              <div className="bg-amber-500/10 p-1.5 rounded-lg border border-amber-500/20">
+                <span className="block text-[9px] uppercase font-bold text-amber-500">Expiring</span>
                 <span className="font-bold text-foreground">{stats.expiringIn7Days}</span>
               </div>
-              <div className="bg-rose-500/10 p-2 rounded-lg border border-rose-500/20">
-                <span className="block text-[10px] uppercase font-bold text-rose-500">Expired</span>
+              <div className="bg-rose-500/10 p-1.5 rounded-lg border border-rose-500/20">
+                <span className="block text-[9px] uppercase font-bold text-rose-500">Expired</span>
                 <span className="font-bold text-foreground">{stats.expiredCount}</span>
               </div>
-              <div className="bg-purple-500/10 p-2 rounded-lg border border-purple-500/20">
-                <span className="block text-[10px] uppercase font-bold text-purple-400">Unpaid</span>
+              <div className="bg-[#00B0F4]/10 p-1.5 rounded-lg border border-[#00B0F4]/20">
+                <span className="block text-[9px] uppercase font-bold text-[#00B0F4]">Frozen</span>
+                <span className="font-bold text-foreground">{stats.frozenCount || 0}</span>
+              </div>
+              <div className="bg-purple-500/10 p-1.5 rounded-lg border border-purple-500/20">
+                <span className="block text-[9px] uppercase font-bold text-purple-400">Unpaid</span>
                 <span className="font-bold text-foreground">{stats.unpaidCount}</span>
               </div>
             </div>

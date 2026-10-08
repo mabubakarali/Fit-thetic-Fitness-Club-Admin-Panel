@@ -51,6 +51,7 @@ interface GymContextType {
   unpaidMembers: UnpaidMemberDetail[];
   expiringMembers: ExpiringMemberDetail[];
   expiredMembers: EnrichedMember[];
+  frozenMembers: EnrichedMember[];
   enrichedPayments: EnrichedPayment[];
   enrichedReceipts: EnrichedReceipt[];
   activityLog: ActivityLogItem[];
@@ -63,6 +64,7 @@ interface GymContextType {
     expiringIn7Days: number;
     expiredCount: number;
     unpaidCount: number;
+    frozenCount: number;
     todayRevenue: number;
     thisMonthRevenue: number;
     totalRevenueAllTime: number;
@@ -80,6 +82,19 @@ interface GymContextType {
   updateMember: (id: string, updates: Partial<Member>) => Promise<void>;
   deleteMember: (id: string) => Promise<void>;
   toggleMemberStatus: (id: string) => Promise<void>;
+  freezeMember: (id: string, reason?: string) => Promise<void>;
+  unfreezeMember: (
+    id: string,
+    options?: {
+      startFreshCycle?: boolean;
+      planId?: string;
+      startDate?: string;
+      customEndDate?: string;
+      amountOverride?: number;
+      immediatePayment?: { method: PaymentMethod; amount?: number; ref?: string; notes?: string };
+    }
+  ) => Promise<{ membership?: Membership; receipt?: Receipt; enrichedReceipt?: EnrichedReceipt }>;
+
 
   renewMembership: (
     memberId: string,
@@ -348,7 +363,18 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let balance_due = 0;
       let is_unpaid = false;
 
-      if (currentMembership) {
+      if (member.status === 'frozen') {
+        timing_status = 'frozen';
+        is_unpaid = false;
+        balance_due = 0;
+        days_remaining = 0;
+        if (currentMembership) {
+          const paymentsForCurrent = payments.filter(
+            (p) => p.membership_id === currentMembership.id && !p.deleted_at
+          );
+          total_paid_for_current_membership = paymentsForCurrent.reduce((acc, p) => acc + p.amount, 0);
+        }
+      } else if (currentMembership) {
         const endDate = new Date(currentMembership.end_date);
         days_remaining = differenceInDays(endDate, todayDate);
 
@@ -397,7 +423,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const details: UnpaidMemberDetail[] = [];
 
     enrichedMembers.forEach((em) => {
-      if (em.is_unpaid && em.current_membership && em.current_plan) {
+      if (em.status !== 'frozen' && em.is_unpaid && em.current_membership && em.current_plan) {
         const dueDate = em.current_membership.start_date;
         const daysOverdue = Math.max(0, differenceInDays(today, new Date(dueDate)));
 
@@ -422,6 +448,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     enrichedMembers.forEach((em) => {
       if (
+        em.status !== 'frozen' &&
         em.current_membership &&
         em.current_plan &&
         em.days_remaining >= 0 &&
@@ -449,8 +476,13 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [enrichedMembers, reminders]);
 
   const expiredMembers: EnrichedMember[] = useMemo(() => {
-    return enrichedMembers.filter((m) => m.timing_status === 'expired');
+    return enrichedMembers.filter((m) => m.timing_status === 'expired' && m.status !== 'frozen');
   }, [enrichedMembers]);
+
+  const frozenMembers: EnrichedMember[] = useMemo(() => {
+    return enrichedMembers.filter((m) => m.status === 'frozen');
+  }, [enrichedMembers]);
+
 
   const enrichedPayments: EnrichedPayment[] = useMemo(() => {
     return payments
@@ -528,6 +560,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const expiring7 = expiringMembers.length;
     const expired = expiredMembers.length;
     const unpaid = unpaidMembers.length;
+    const frozen = frozenMembers.length;
 
     let todayRev = 0;
     let thisMonthRev = 0;
@@ -551,11 +584,12 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       expiringIn7Days: expiring7,
       expiredCount: expired,
       unpaidCount: unpaid,
+      frozenCount: frozen,
       todayRevenue: todayRev,
       thisMonthRevenue: thisMonthRev,
       totalRevenueAllTime: totalRev,
     };
-  }, [members, enrichedMembers, expiringMembers, expiredMembers, unpaidMembers, payments]);
+  }, [members, enrichedMembers, expiringMembers, expiredMembers, unpaidMembers, frozenMembers, payments]);
 
   const activityLog: ActivityLogItem[] = useMemo(() => {
     const items: ActivityLogItem[] = [];
@@ -891,6 +925,82 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newStatus = member.status === 'active' ? 'inactive' : 'active';
     await updateMember(id, { status: newStatus });
   };
+
+  const freezeMember = async (id: string, reason?: string) => {
+    const member = members.find((m) => m.id === id);
+    if (!member) return;
+
+    const nowIso = new Date().toISOString();
+    const deviceId = getDeviceId();
+    const updated: Member = {
+      ...member,
+      status: 'frozen',
+      frozen_at: nowIso,
+      frozen_reason: reason || 'Membership frozen / placed on temporary hold',
+      updated_by: deviceId,
+      updated_at: nowIso,
+    };
+
+    await putInStore('members', updated);
+    await enqueueSync('members', id, 'UPDATE', updated);
+    setMembers((prev) => prev.map((m) => (m.id === id ? updated : m)));
+    processSyncQueue();
+  };
+
+  const unfreezeMember = async (
+    id: string,
+    options?: {
+      startFreshCycle?: boolean;
+      planId?: string;
+      startDate?: string;
+      customEndDate?: string;
+      amountOverride?: number;
+      immediatePayment?: { method: PaymentMethod; amount?: number; ref?: string; notes?: string };
+    }
+  ) => {
+    const member = members.find((m) => m.id === id);
+    if (!member) return {};
+
+    const nowIso = new Date().toISOString();
+    const deviceId = getDeviceId();
+    const updated: Member = {
+      ...member,
+      status: 'active',
+      frozen_at: null,
+      frozen_reason: null,
+      updated_by: deviceId,
+      updated_at: nowIso,
+    };
+
+    await putInStore('members', updated);
+    await enqueueSync('members', id, 'UPDATE', updated);
+    setMembers((prev) => prev.map((m) => (m.id === id ? updated : m)));
+
+    let createdMembership: Membership | undefined;
+    let createdReceipt: Receipt | undefined;
+    let enrichedReceipt: EnrichedReceipt | undefined;
+
+    if (options?.startFreshCycle || options?.planId) {
+      const planId = options.planId || (memberships.filter((ms) => ms.member_id === id)[0]?.plan_id) || plans[0]?.id || 'plan-01';
+      const startDate = options.startDate || format(new Date(), 'yyyy-MM-dd');
+
+      const renewRes = await renewMembership(
+        id,
+        planId,
+        startDate,
+        options.customEndDate,
+        options.amountOverride,
+        options.immediatePayment
+      );
+      createdMembership = renewRes.membership;
+      createdReceipt = renewRes.receipt;
+      enrichedReceipt = renewRes.enrichedReceipt;
+    }
+
+    processSyncQueue();
+    return { membership: createdMembership, receipt: createdReceipt, enrichedReceipt };
+  };
+
 
   const renewMembership = async (
     memberId: string,
@@ -1597,6 +1707,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         unpaidMembers,
         expiringMembers,
         expiredMembers,
+        frozenMembers,
         enrichedPayments,
         enrichedReceipts,
         getEnrichedReceipt,
@@ -1607,10 +1718,13 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateMember,
         deleteMember,
         toggleMemberStatus,
+        freezeMember,
+        unfreezeMember,
         renewMembership,
         deleteMembership,
         recordPayment,
         deletePayment,
+
         addPlan,
         updatePlan,
         deletePlan,
