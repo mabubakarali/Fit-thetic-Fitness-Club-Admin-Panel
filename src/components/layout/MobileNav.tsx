@@ -11,6 +11,7 @@ import {
   MessageSquare,
   Settings,
   History,
+  Snowflake,
   X
 } from 'lucide-react';
 import { useGym } from '@/context/GymContext';
@@ -33,6 +34,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ currentTab, onSelectTab, o
   ];
 
   const moreItems: { id: NavTab; label: string; icon: React.ReactNode; badge?: number }[] = [
+    { id: 'freeze-unfreeze', label: 'Freeze / Unfreeze', icon: <Snowflake className="h-5 w-5 text-[#00B0F4]" />, badge: stats.frozenCount > 0 ? stats.frozenCount : undefined },
     { id: 'plans', label: 'Membership Plans', icon: <Layers className="h-5 w-5" /> },
     { id: 'receipts', label: 'Receipts Archive', icon: <Receipt className="h-5 w-5" /> },
     { id: 'whatsapp', label: 'WhatsApp Reminders', icon: <MessageSquare className="h-5 w-5" />, badge: stats.expiringIn7Days },

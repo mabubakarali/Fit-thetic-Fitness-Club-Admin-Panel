@@ -11,8 +11,6 @@ import { AddMemberModal } from '@/components/members/AddMemberModal';
 import { ImportMembersModal } from '@/components/members/ImportMembersModal';
 import { RecordPaymentModal } from '@/components/members/RecordPaymentModal';
 import { RenewMembershipModal } from '@/components/members/RenewMembershipModal';
-import { FreezeMemberModal } from '@/components/members/FreezeMemberModal';
-import { UnfreezeMemberModal } from '@/components/members/UnfreezeMemberModal';
 import { ReceiptModal } from '@/components/receipts/ReceiptModal';
 import { EnrichedMember, EnrichedReceipt, Receipt } from '@/types/database';
 import {
@@ -73,8 +71,6 @@ export const Members: React.FC<MembersProps> = ({
   const [payMember, setPayMember] = useState<EnrichedMember | null>(null);
   const [payMode, setPayMode] = useState<'pay_due' | 'extend'>('pay_due');
   const [renewMember, setRenewMember] = useState<EnrichedMember | null>(null);
-  const [freezeMemberTarget, setFreezeMemberTarget] = useState<EnrichedMember | null>(null);
-  const [unfreezeMemberTarget, setUnfreezeMemberTarget] = useState<EnrichedMember | null>(null);
   const [memberToDelete, setMemberToDelete] = useState<EnrichedMember | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [activeReceipt, setActiveReceipt] = useState<EnrichedReceipt | null>(null);
@@ -446,43 +442,19 @@ export const Members: React.FC<MembersProps> = ({
                           <span>WhatsApp</span>
                         </a>
 
-                        {member.status === 'frozen' ? (
+                        {member.status !== 'frozen' && (
                           <Button
                             variant="primary"
                             size="xs"
-                            leftIcon={<Play className="h-3 w-3 fill-white" />}
-                            onClick={() => setUnfreezeMemberTarget(member)}
-                            className="bg-[#00B0F4] hover:bg-[#009CDA] text-white"
-                            title="Reactivate member and start fresh month"
+                            leftIcon={member.timing_status === 'expired' || member.is_unpaid ? <DollarSign className="h-3 w-3" /> : <RotateCw className="h-3 w-3" />}
+                            onClick={() => {
+                              setPayMember(member);
+                              setPayMode(member.is_unpaid && member.timing_status !== 'expired' ? 'pay_due' : 'extend');
+                            }}
+                            title={member.timing_status === 'expired' ? 'Pay renewal fee & activate next cycle' : member.is_unpaid ? 'Pay outstanding balance' : 'Extend membership for next cycle'}
                           >
-                            Unfreeze
+                            {member.timing_status === 'expired' || member.is_unpaid ? 'Pay Due' : 'Extend Plan'}
                           </Button>
-                        ) : (
-                          <>
-                            <Button
-                              variant="primary"
-                              size="xs"
-                              leftIcon={member.timing_status === 'expired' || member.is_unpaid ? <DollarSign className="h-3 w-3" /> : <RotateCw className="h-3 w-3" />}
-                              onClick={() => {
-                                setPayMember(member);
-                                setPayMode(member.is_unpaid && member.timing_status !== 'expired' ? 'pay_due' : 'extend');
-                              }}
-                              title={member.timing_status === 'expired' ? 'Pay renewal fee & activate next cycle' : member.is_unpaid ? 'Pay outstanding balance' : 'Extend membership for next cycle'}
-                            >
-                              {member.timing_status === 'expired' || member.is_unpaid ? 'Pay Due' : 'Extend Plan'}
-                            </Button>
-
-                            <Button
-                              variant="ghost"
-                              size="xs"
-                              leftIcon={<Snowflake className="h-3 w-3 text-cyan-400" />}
-                              onClick={() => setFreezeMemberTarget(member)}
-                              title="Put membership on temporary hold / freeze"
-                              className="text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 px-2"
-                            >
-                              Freeze
-                            </Button>
-                          </>
                         )}
 
                         <Button
@@ -594,40 +566,18 @@ export const Members: React.FC<MembersProps> = ({
                     <span>WhatsApp</span>
                   </a>
 
-                  {member.status === 'frozen' ? (
+                  {member.status !== 'frozen' && (
                     <Button
                       variant="primary"
                       size="xs"
-                      leftIcon={<Play className="h-3 w-3 fill-white" />}
-                      onClick={() => setUnfreezeMemberTarget(member)}
-                      className="bg-[#00B0F4] hover:bg-[#009CDA] text-white"
+                      leftIcon={member.timing_status === 'expired' || member.is_unpaid ? <DollarSign className="h-3 w-3" /> : <RotateCw className="h-3 w-3" />}
+                      onClick={() => {
+                        setPayMember(member);
+                        setPayMode(member.is_unpaid && member.timing_status !== 'expired' ? 'pay_due' : 'extend');
+                      }}
                     >
-                      Unfreeze
+                      {member.timing_status === 'expired' || member.is_unpaid ? 'Pay Due' : 'Extend'}
                     </Button>
-                  ) : (
-                    <>
-                      <Button
-                        variant="primary"
-                        size="xs"
-                        leftIcon={member.timing_status === 'expired' || member.is_unpaid ? <DollarSign className="h-3 w-3" /> : <RotateCw className="h-3 w-3" />}
-                        onClick={() => {
-                          setPayMember(member);
-                          setPayMode(member.is_unpaid && member.timing_status !== 'expired' ? 'pay_due' : 'extend');
-                        }}
-                      >
-                        {member.timing_status === 'expired' || member.is_unpaid ? 'Pay Due' : 'Extend'}
-                      </Button>
-
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        leftIcon={<Snowflake className="h-3 w-3 text-cyan-400" />}
-                        onClick={() => setFreezeMemberTarget(member)}
-                        className="text-cyan-400 hover:bg-cyan-500/10 px-2"
-                      >
-                        Freeze
-                      </Button>
-                    </>
                   )}
 
                   <Button
@@ -677,21 +627,6 @@ export const Members: React.FC<MembersProps> = ({
         member={renewMember}
         isOpen={Boolean(renewMember)}
         onClose={() => setRenewMember(null)}
-        onSuccess={handleCreatedReceipt}
-      />
-
-      {/* Freeze Member Modal */}
-      <FreezeMemberModal
-        member={freezeMemberTarget}
-        isOpen={Boolean(freezeMemberTarget)}
-        onClose={() => setFreezeMemberTarget(null)}
-      />
-
-      {/* Unfreeze Member Modal */}
-      <UnfreezeMemberModal
-        member={unfreezeMemberTarget}
-        isOpen={Boolean(unfreezeMemberTarget)}
-        onClose={() => setUnfreezeMemberTarget(null)}
         onSuccess={handleCreatedReceipt}
       />
 

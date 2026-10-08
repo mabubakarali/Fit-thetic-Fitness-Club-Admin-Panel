@@ -9,13 +9,15 @@ import {
   MessageSquare,
   Settings as SettingsIcon,
   Dumbbell,
-  Clock
+  Clock,
+  Snowflake,
 } from 'lucide-react';
 import { useGym } from '@/context/GymContext';
 
 export type NavTab =
   | 'dashboard'
   | 'members'
+  | 'freeze-unfreeze'
   | 'payments'
   | 'unpaid'
   | 'plans'
@@ -48,6 +50,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: <Users className="h-4 w-4" />,
       badge: stats.allRegisteredMembers,
       badgeColor: 'bg-[#5865F2] text-white font-bold',
+    },
+    {
+      id: 'freeze-unfreeze',
+      label: 'Freeze / Unfreeze',
+      icon: <Snowflake className="h-4 w-4 text-[#00B0F4]" />,
+      badge: stats.frozenCount > 0 ? stats.frozenCount : undefined,
+      badgeColor: 'bg-[#00B0F4] text-white font-bold',
     },
     {
       id: 'payments',

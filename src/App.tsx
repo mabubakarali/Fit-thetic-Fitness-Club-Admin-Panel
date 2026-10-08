@@ -8,6 +8,7 @@ import { Members } from './pages/Members';
 import { MemberDetail } from './pages/MemberDetail';
 import { Payments } from './pages/Payments';
 import { Unpaid } from './pages/Unpaid';
+import { FreezeUnfreeze } from './pages/FreezeUnfreeze';
 import { MembershipPlans } from './pages/MembershipPlans';
 import { Receipts } from './pages/Receipts';
 import { WhatsApp } from './pages/WhatsApp';
@@ -48,6 +49,7 @@ export const AppContent: React.FC = () => {
       currentTab={currentTab}
       onSelectTab={handleNavigateTab}
       onGlobalSearch={handleGlobalSearch}
+      onSelectMemberDetail={handleSelectMember}
     >
       {selectedMemberId ? (
         <MemberDetail
@@ -65,6 +67,13 @@ export const AppContent: React.FC = () => {
 
           {currentTab === 'members' && (
             <Members
+              onSelectMemberDetail={handleSelectMember}
+              searchQueryProp={globalSearch}
+            />
+          )}
+
+          {currentTab === 'freeze-unfreeze' && (
+            <FreezeUnfreeze
               onSelectMemberDetail={handleSelectMember}
               searchQueryProp={globalSearch}
             />
