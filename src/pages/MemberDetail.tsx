@@ -76,7 +76,6 @@ export const MemberDetail: React.FC<MemberDetailProps> = ({ memberId, onBack }) 
   const [editAddress, setEditAddress] = useState('');
   const [editEmergency, setEditEmergency] = useState('');
   const [editNotes, setEditNotes] = useState('');
-  const [editPlanId, setEditPlanId] = useState('');
 
   if (!member) {
     return (
@@ -98,7 +97,6 @@ export const MemberDetail: React.FC<MemberDetailProps> = ({ memberId, onBack }) 
     setEditAddress(member.address || '');
     setEditEmergency(member.emergency_contact || '');
     setEditNotes(member.notes || '');
-    setEditPlanId(member.current_plan?.id || plans[0]?.id || '');
     setIsEditModalOpen(true);
   };
 
@@ -114,11 +112,7 @@ export const MemberDetail: React.FC<MemberDetailProps> = ({ memberId, onBack }) 
         notes: editNotes.trim() || undefined,
       });
 
-      if (editPlanId && editPlanId !== member.current_plan?.id) {
-        await updateMemberPlan(member.id, editPlanId, { updateAmount: true });
-      }
-
-      showToast('Profile Updated', 'Member details and assigned plan saved successfully.');
+      showToast('Profile Updated', 'Member details saved successfully.');
       setIsEditModalOpen(false);
     } catch (err: any) {
       showToast('Update Failed', err.message || 'Error updating member', 'error');
@@ -578,15 +572,6 @@ export const MemberDetail: React.FC<MemberDetailProps> = ({ memberId, onBack }) 
             label="Emergency Contact"
             value={editEmergency}
             onChange={(e) => setEditEmergency(e.target.value)}
-          />
-          <Select
-            label="Assigned Membership Plan *"
-            value={editPlanId}
-            onChange={(e) => setEditPlanId(e.target.value)}
-            options={plans.map((p) => ({
-              value: p.id,
-              label: `${p.name} — ${currency} ${p.price.toLocaleString()} (${p.duration_days} days)`,
-            }))}
           />
           <Input
             label="Notes"

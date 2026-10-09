@@ -168,7 +168,7 @@ export const RenewMembershipModal: React.FC<RenewMembershipModalProps> = ({
           <Select
             label="Renewal Plan *"
             value={selectedPlanId}
-            onChange={(e) => setSelectedPlanId(e.target.value)}
+            onChange={(e) => handlePlanChange(e.target.value)}
             options={plans.map((p) => ({
               value: p.id,
               label: `${p.name} — ${currency} ${p.price.toLocaleString()} (${p.duration_days}d)`,
@@ -186,7 +186,7 @@ export const RenewMembershipModal: React.FC<RenewMembershipModalProps> = ({
             label="Renewal Start Date *"
             type="date"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={(e) => handleStartDateChange(e.target.value)}
           />
 
           <Input
