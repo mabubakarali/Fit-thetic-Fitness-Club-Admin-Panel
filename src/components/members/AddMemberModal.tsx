@@ -7,8 +7,12 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Member, PaymentMethod, Receipt, EnrichedReceipt } from '@/types/database';
 import { SEED_MEMBERSHIP_PLANS } from '@/lib/seedData';
-import { format, addDays } from 'date-fns';
+import { format } from 'date-fns';
 import confetti from 'canvas-confetti';
+import {
+  calculateCycleEndDate,
+  getTodayDateStr,
+} from '@/lib/dateUtils';
 import {
   UserPlus,
   CreditCard,
@@ -47,7 +51,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
 
   // Membership fields
   const [selectedPlanId, setSelectedPlanId] = useState(defaultPlan.id);
-  const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [startDate, setStartDate] = useState(getTodayDateStr());
   const [endDate, setEndDate] = useState('');
   const [isEndDateOverridden, setIsEndDateOverridden] = useState(false);
 
@@ -66,12 +70,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
     setIsEndDateOverridden(false);
     const plan = availablePlans.find((p) => p.id === selectedPlanId) || defaultPlan;
     if (plan && newStart) {
-      const [y, m, d] = newStart.split('-').map(Number);
-      if (y && m && d) {
-        const startObj = new Date(y, m - 1, d);
-        const endObj = addDays(startObj, plan.duration_days);
-        setEndDate(format(endObj, 'yyyy-MM-dd'));
-      }
+      setEndDate(calculateCycleEndDate(newStart, plan.duration_days));
     }
   };
 
@@ -82,12 +81,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
     if (plan) {
       setPaymentAmount(plan.price);
       if (startDate) {
-        const [y, m, d] = startDate.split('-').map(Number);
-        if (y && m && d) {
-          const startObj = new Date(y, m - 1, d);
-          const endObj = addDays(startObj, plan.duration_days);
-          setEndDate(format(endObj, 'yyyy-MM-dd'));
-        }
+        setEndDate(calculateCycleEndDate(startDate, plan.duration_days));
       }
     }
   };
@@ -96,12 +90,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
   useEffect(() => {
     const plan = availablePlans.find((p) => p.id === selectedPlanId) || defaultPlan;
     if (plan && startDate && !endDate) {
-      const [y, m, d] = startDate.split('-').map(Number);
-      if (y && m && d) {
-        const startObj = new Date(y, m - 1, d);
-        const endObj = addDays(startObj, plan.duration_days);
-        setEndDate(format(endObj, 'yyyy-MM-dd'));
-      }
+      setEndDate(calculateCycleEndDate(startDate, plan.duration_days));
       setPaymentAmount(plan.price);
     }
   }, [selectedPlanId, startDate, availablePlans, defaultPlan, endDate]);

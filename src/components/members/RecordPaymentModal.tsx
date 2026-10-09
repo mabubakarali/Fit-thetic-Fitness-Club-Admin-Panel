@@ -7,9 +7,14 @@ import { Badge } from '@/components/ui/Badge';
 import { useGym } from '@/context/GymContext';
 import { useToast } from '@/components/ui/Toast';
 import { EnrichedMember, PaymentMethod, Receipt, EnrichedReceipt } from '@/types/database';
-import { format, addDays } from 'date-fns';
+import { format } from 'date-fns';
 import { DollarSign, Search, UserCheck, RotateCw } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import {
+  calculateCycleEndDate,
+  getConsecutiveCycleStartDate,
+  getTodayDateStr,
+} from '@/lib/dateUtils';
 
 export interface RecordPaymentModalProps {
   initialMember?: EnrichedMember | null;
@@ -26,7 +31,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   onSuccess,
   initialMode = 'pay_due',
 }) => {
-  const { enrichedMembers, plans, recordPayment, renewMembership, settings } = useGym();
+  const { enrichedMembers, plans, recordPayment, renewMembership, updateMemberPlan, settings } = useGym();
   const { showToast } = useToast();
 
   const [selectedMemberId, setSelectedMemberId] = useState(initialMember?.id || '');
@@ -36,13 +41,13 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
   // Plan & Period Details
   const [selectedPlanId, setSelectedPlanId] = useState('');
-  const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [startDate, setStartDate] = useState(getTodayDateStr());
   const [endDate, setEndDate] = useState('');
 
   // Payment Details
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [amount, setAmount] = useState<number>(0);
-  const [paymentDate, setPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [paymentDate, setPaymentDate] = useState(getTodayDateStr());
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -64,31 +69,31 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
       }
       setSearchQuery('');
     }
-  }, [isOpen, initialMember]);
+  }, [isOpen, initialMember?.id]);
 
-  // When a member is selected, configure plan, consecutive cycle dates, and amount
+  // When a member is selected or changed, configure plan, consecutive cycle dates, and amount ONCE
   useEffect(() => {
-    if (currentMember) {
+    if (selectedMemberId && currentMember) {
       const defaultPlan = currentMember.current_plan || plans[0];
-      const planToUse = plans.find((p) => p.id === selectedPlanId) || defaultPlan;
-      if (planToUse && (!selectedPlanId || !plans.some((p) => p.id === selectedPlanId))) {
+      const planToUse = defaultPlan;
+      if (planToUse) {
         setSelectedPlanId(planToUse.id);
       }
 
-      // Calculate consecutive start date from previous expiry
-      let calcStart = format(new Date(), 'yyyy-MM-dd');
-      if (currentMember.current_membership) {
-        const prevEnd = new Date(currentMember.current_membership.end_date);
-        calcStart = format(addDays(prevEnd, 1), 'yyyy-MM-dd');
-      }
+      // Calculate consecutive start date:
+      // If member has an active membership (e.g. 1 day left, 5 days left), next cycle starts consecutive from day after previous expiry
+      const calcStart = currentMember.current_membership
+        ? getConsecutiveCycleStartDate(currentMember.current_membership.end_date)
+        : getTodayDateStr();
+
       setStartDate(calcStart);
 
       if (planToUse) {
-        setEndDate(format(addDays(new Date(calcStart), planToUse.duration_days), 'yyyy-MM-dd'));
+        setEndDate(calculateCycleEndDate(calcStart, planToUse.duration_days));
       }
 
-      // If member is expired, they must renew for the consecutive period
-      if (currentMember.timing_status === 'expired') {
+      // Determine initial mode & amount
+      if (initialMode === 'extend' || currentMember.timing_status === 'expired') {
         setPaymentMode('extend');
         setAmount(planToUse?.price || 2500);
       } else if (currentMember.is_unpaid && currentMember.balance_due > 0) {
@@ -99,14 +104,14 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
         setAmount(planToUse?.price || 2500);
       }
     }
-  }, [selectedMemberId, currentMember, plans]);
+  }, [selectedMemberId, isOpen]);
 
   // When selected plan changes, recalculate end date and amount
   const handlePlanChange = (planId: string) => {
     setSelectedPlanId(planId);
     const plan = plans.find((p) => p.id === planId);
     if (plan) {
-      setEndDate(format(addDays(new Date(startDate), plan.duration_days), 'yyyy-MM-dd'));
+      setEndDate(calculateCycleEndDate(startDate, plan.duration_days));
       setAmount(plan.price);
     }
   };
@@ -165,13 +170,18 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
         enrichedReceipt = res.enrichedReceipt;
         showToast(
           'Membership Renewed & Paid',
-          `New cycle active from ${startDate} to ${endDate}. Receipt #${createdReceipt?.receipt_number || ''}`
+          `New plan ${plan.name} active from ${startDate} to ${endDate}. Receipt #${createdReceipt?.receipt_number || ''}`
         );
       } else {
         if (!currentMember.current_membership) {
           showToast('Error', 'Member has no membership record to record payment against', 'error');
           setIsSubmitting(false);
           return;
+        }
+
+        // If plan was changed in dropdown for current dues, update current membership plan
+        if (selectedPlanId && selectedPlanId !== currentMember.current_plan?.id) {
+          await updateMemberPlan(currentMember.id, selectedPlanId, { updateAmount: true });
         }
 
         const res = await recordPayment(
@@ -458,7 +468,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                     onChange={(e) => {
                       setStartDate(e.target.value);
                       const p = plans.find((pl) => pl.id === selectedPlanId);
-                      if (p) setEndDate(format(addDays(new Date(e.target.value), p.duration_days), 'yyyy-MM-dd'));
+                      if (p) setEndDate(calculateCycleEndDate(e.target.value, p.duration_days));
                     }}
                     helperText={
                       currentMember.current_membership

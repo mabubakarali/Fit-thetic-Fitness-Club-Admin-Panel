@@ -6,8 +6,12 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { EnrichedMember, EnrichedReceipt, PaymentMethod, Receipt } from '@/types/database';
 import { Play, DollarSign, Calendar, Sparkles, CheckCircle } from 'lucide-react';
-import { format, addDays } from 'date-fns';
+import { format } from 'date-fns';
 import { useToast } from '@/components/ui/Toast';
+import {
+  calculateCycleEndDate,
+  getTodayDateStr,
+} from '@/lib/dateUtils';
 
 export interface UnfreezeMemberModalProps {
   member: EnrichedMember | null;
@@ -26,7 +30,7 @@ export const UnfreezeMemberModal: React.FC<UnfreezeMemberModalProps> = ({
   const { showToast } = useToast();
 
   const [selectedPlanId, setSelectedPlanId] = useState('');
-  const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [startDate, setStartDate] = useState(getTodayDateStr());
   const [recordPaymentNow, setRecordPaymentNow] = useState(true);
   const [payAmount, setPayAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
@@ -38,17 +42,18 @@ export const UnfreezeMemberModal: React.FC<UnfreezeMemberModalProps> = ({
   const selectedPlan = plans.find((p) => p.id === selectedPlanId) || activePlans[0];
   const currency = settings.currency || 'Rs.';
 
+  // Initialize once when modal opens or member ID changes
   useEffect(() => {
-    if (member) {
+    if (isOpen && member) {
       const defaultPlan = member.current_plan || activePlans[0];
       if (defaultPlan) {
         setSelectedPlanId(defaultPlan.id);
         setPayAmount(defaultPlan.price);
       }
-      setStartDate(format(new Date(), 'yyyy-MM-dd'));
+      setStartDate(getTodayDateStr());
       setRecordPaymentNow(true);
     }
-  }, [member, isOpen]);
+  }, [member?.id, isOpen]);
 
   useEffect(() => {
     if (selectedPlan) {
@@ -59,7 +64,7 @@ export const UnfreezeMemberModal: React.FC<UnfreezeMemberModalProps> = ({
   if (!member) return null;
 
   const durationDays = selectedPlan?.duration_days || 30;
-  const calculatedEndDate = format(addDays(new Date(startDate), durationDays), 'yyyy-MM-dd');
+  const calculatedEndDate = calculateCycleEndDate(startDate, durationDays);
 
   const handleUnfreeze = async (e: React.FormEvent) => {
     e.preventDefault();

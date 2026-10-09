@@ -32,7 +32,13 @@ import { generateUUID } from '@/lib/uuid';
 import { getDeviceId } from '@/lib/deviceId';
 import { useAuth } from './AuthContext';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { format, isToday, isThisMonth, differenceInDays, addDays } from 'date-fns';
+import { format, isToday, isThisMonth, differenceInDays } from 'date-fns';
+import {
+  calculateCycleEndDate,
+  getConsecutiveCycleStartDate,
+  getTodayDateStr,
+  addDaysToDate,
+} from '@/lib/dateUtils';
 
 interface GymContextType {
   // Raw state
@@ -80,6 +86,11 @@ interface GymContextType {
   ) => Promise<{ member: Member; membership: Membership; receipt?: Receipt; enrichedReceipt?: EnrichedReceipt }>;
 
   updateMember: (id: string, updates: Partial<Member>) => Promise<void>;
+  updateMemberPlan: (
+    memberId: string,
+    newPlanId: string,
+    options?: { updateAmount?: boolean; customAmount?: number }
+  ) => Promise<void>;
   deleteMember: (id: string) => Promise<void>;
   toggleMemberStatus: (id: string) => Promise<void>;
   freezeMember: (id: string, reason?: string) => Promise<void>;
@@ -343,7 +354,13 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return members.map((member) => {
       const memberMemberships = memberships
         .filter((ms) => ms.member_id === member.id && !ms.deleted_at)
-        .sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
+        .sort((a, b) => {
+          const endDiff = new Date(b.end_date).getTime() - new Date(a.end_date).getTime();
+          if (endDiff !== 0) return endDiff;
+          const startDiff = new Date(b.start_date).getTime() - new Date(a.start_date).getTime();
+          if (startDiff !== 0) return startDiff;
+          return new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime();
+        });
 
       const currentMembership = memberMemberships[0];
       const currentPlan = currentMembership
@@ -743,7 +760,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const planPrice = plan?.price || 3000;
     const startDate = customStartDate || format(new Date(), 'yyyy-MM-dd');
     const endDate =
-      customEndDate || format(addDays(new Date(startDate), duration), 'yyyy-MM-dd');
+      customEndDate || calculateCycleEndDate(startDate, duration);
     const nowIso = new Date().toISOString();
     const deviceId = getDeviceId();
 
@@ -850,6 +867,71 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await putInStore('members', updated);
     await enqueueSync('members', id, 'UPDATE', updated);
     setMembers((prev) => prev.map((m) => (m.id === id ? updated : m)));
+    processSyncQueue();
+  };
+
+  const updateMemberPlan = async (
+    memberId: string,
+    newPlanId: string,
+    options?: { updateAmount?: boolean; customAmount?: number }
+  ) => {
+    const memberMemberships = memberships
+      .filter((ms) => ms.member_id === memberId && !ms.deleted_at)
+      .sort((a, b) => {
+        const endDiff = new Date(b.end_date).getTime() - new Date(a.end_date).getTime();
+        if (endDiff !== 0) return endDiff;
+        return new Date(b.start_date).getTime() - new Date(a.start_date).getTime();
+      });
+
+    const currentMembership = memberMemberships[0];
+    const newPlan = plans.find((p) => p.id === newPlanId);
+    if (!newPlan) return;
+
+    const nowIso = new Date().toISOString();
+    const deviceId = getDeviceId();
+
+    if (currentMembership) {
+      const newAmount = options?.customAmount !== undefined
+        ? options.customAmount
+        : options?.updateAmount
+        ? newPlan.price
+        : currentMembership.amount || newPlan.price;
+
+      const updatedMembership: Membership = {
+        ...currentMembership,
+        plan_id: newPlanId,
+        amount: newAmount,
+        notes: `Plan updated to ${newPlan.name}`,
+        updated_by: deviceId,
+        updated_at: nowIso,
+      };
+
+      await putInStore('memberships', updatedMembership);
+      await enqueueSync('memberships', updatedMembership.id, 'UPDATE', updatedMembership);
+      setMemberships((prev) => prev.map((ms) => (ms.id === updatedMembership.id ? updatedMembership : ms)));
+    } else {
+      const today = getTodayDateStr();
+      const newMembership: Membership = {
+        id: generateUUID(),
+        gym_id: activeGymId,
+        member_id: memberId,
+        plan_id: newPlanId,
+        start_date: today,
+        end_date: calculateCycleEndDate(today, newPlan.duration_days),
+        amount: newPlan.price,
+        status: 'active',
+        notes: `Assigned plan ${newPlan.name}`,
+        updated_by: deviceId,
+        created_at: nowIso,
+        updated_at: nowIso,
+      };
+
+      await putInStore('memberships', newMembership);
+      await enqueueSync('memberships', newMembership.id, 'INSERT', newMembership);
+      setMemberships((prev) => [newMembership, ...prev]);
+    }
+
+    processSyncQueue();
   };
 
   const deleteMember = async (id: string) => {
@@ -1016,7 +1098,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const planNameToUse = plan?.name || 'Standard Monthly Plan';
     const planPriceToUse = plan?.price || 3000;
     const endDate =
-      customEndDate || format(addDays(new Date(startDate), duration), 'yyyy-MM-dd');
+      customEndDate || calculateCycleEndDate(startDate, duration);
     const amount = amountOverride !== undefined ? amountOverride : planPriceToUse;
     const nowIso = new Date().toISOString();
     const deviceId = getDeviceId();
@@ -1716,6 +1798,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         addMember,
         updateMember,
+        updateMemberPlan,
         deleteMember,
         toggleMemberStatus,
         freezeMember,

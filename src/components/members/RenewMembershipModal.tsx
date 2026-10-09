@@ -6,9 +6,14 @@ import { Button } from '@/components/ui/Button';
 import { useGym } from '@/context/GymContext';
 import { useToast } from '@/components/ui/Toast';
 import { EnrichedMember, PaymentMethod, Receipt, EnrichedReceipt } from '@/types/database';
-import { format, addDays } from 'date-fns';
+import { format } from 'date-fns';
 import { RotateCw, CreditCard, Clock } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import {
+  calculateCycleEndDate,
+  getConsecutiveCycleStartDate,
+  getTodayDateStr,
+} from '@/lib/dateUtils';
 
 export interface RenewMembershipModalProps {
   member: EnrichedMember | null;
@@ -39,34 +44,25 @@ export const RenewMembershipModal: React.FC<RenewMembershipModalProps> = ({
   const [paymentNotes, setPaymentNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Initialize once when modal opens or member ID changes
   useEffect(() => {
-    if (member) {
+    if (isOpen && member) {
       const plan = member.current_plan || plans[0];
       if (plan) {
         setSelectedPlanId(plan.id);
         setAmountOverride(plan.price);
 
-        // Strict consecutive renewal date
-        let start = format(new Date(), 'yyyy-MM-dd');
-        if (member.current_membership) {
-          const prevEnd = new Date(member.current_membership.end_date);
-          start = format(addDays(prevEnd, 1), 'yyyy-MM-dd');
-        }
+        // Strict consecutive renewal date from previous expiry
+        const start = member.current_membership
+          ? getConsecutiveCycleStartDate(member.current_membership.end_date)
+          : getTodayDateStr();
 
         setStartDate(start);
-        setEndDate(format(addDays(new Date(start), plan.duration_days), 'yyyy-MM-dd'));
+        setEndDate(calculateCycleEndDate(start, plan.duration_days));
+        setIsEndDateOverridden(false);
       }
     }
-  }, [member, plans, isOpen]);
-
-  // Recalculate end date on plan or start date change
-  useEffect(() => {
-    const plan = plans.find((p) => p.id === selectedPlanId);
-    if (plan && startDate && !isEndDateOverridden) {
-      setEndDate(format(addDays(new Date(startDate), plan.duration_days), 'yyyy-MM-dd'));
-      setAmountOverride(plan.price);
-    }
-  }, [selectedPlanId, startDate, plans, isEndDateOverridden]);
+  }, [member?.id, isOpen]);
 
   if (!member) return null;
 
@@ -76,7 +72,7 @@ export const RenewMembershipModal: React.FC<RenewMembershipModalProps> = ({
     if (plan) {
       setAmountOverride(plan.price);
       if (startDate) {
-        setEndDate(format(addDays(new Date(startDate), plan.duration_days), 'yyyy-MM-dd'));
+        setEndDate(calculateCycleEndDate(startDate, plan.duration_days));
       }
     }
   };
@@ -85,7 +81,7 @@ export const RenewMembershipModal: React.FC<RenewMembershipModalProps> = ({
     setStartDate(val);
     const plan = plans.find((p) => p.id === selectedPlanId);
     if (plan && val) {
-      setEndDate(format(addDays(new Date(val), plan.duration_days), 'yyyy-MM-dd'));
+      setEndDate(calculateCycleEndDate(val, plan.duration_days));
     }
   };
 
