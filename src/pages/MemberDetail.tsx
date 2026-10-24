@@ -11,6 +11,8 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { RecordPaymentModal } from '@/components/members/RecordPaymentModal';
 import { RenewMembershipModal } from '@/components/members/RenewMembershipModal';
+import { FreezeMemberModal } from '@/components/members/FreezeMemberModal';
+import { UnfreezeMemberModal } from '@/components/members/UnfreezeMemberModal';
 import { ReceiptModal } from '@/components/receipts/ReceiptModal';
 import { EnrichedPayment, EnrichedReceipt, Payment, Receipt } from '@/types/database';
 import {
@@ -33,6 +35,7 @@ import {
   Trash2,
   RotateCcw,
   Snowflake,
+  Play,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -62,6 +65,8 @@ export const MemberDetail: React.FC<MemberDetailProps> = ({ memberId, onBack }) 
   // Modals
   const [isRecordPayOpen, setIsRecordPayOpen] = useState(false);
   const [isRenewOpen, setIsRenewOpen] = useState(false);
+  const [isFreezeOpen, setIsFreezeOpen] = useState(false);
+  const [isUnfreezeOpen, setIsUnfreezeOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [paymentToVoid, setPaymentToVoid] = useState<Payment | null>(null);
   const [isVoiding, setIsVoiding] = useState(false);
@@ -198,6 +203,28 @@ export const MemberDetail: React.FC<MemberDetailProps> = ({ memberId, onBack }) 
             Record Payment
           </Button>
 
+          {member.status === 'frozen' ? (
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<Play className="h-3.5 w-3.5 text-emerald-400" />}
+              onClick={() => setIsUnfreezeOpen(true)}
+              className="border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 font-semibold"
+            >
+              Unfreeze Member
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<Snowflake className="h-3.5 w-3.5 text-[#00B0F4]" />}
+              onClick={() => setIsFreezeOpen(true)}
+              className="border-[#00B0F4]/40 text-[#00B0F4] hover:bg-[#00B0F4]/10 font-semibold"
+            >
+              Freeze Member
+            </Button>
+          )}
+
           <Button
             variant="ghost"
             size="sm"
@@ -221,7 +248,7 @@ export const MemberDetail: React.FC<MemberDetailProps> = ({ memberId, onBack }) 
 
       {/* Frozen Alert Banner */}
       {member.status === 'frozen' && (
-        <div className="p-4 rounded-xl bg-[#00B0F4]/10 border border-[#00B0F4]/30 flex items-start justify-between gap-4">
+        <div className="p-4 rounded-xl bg-[#00B0F4]/10 border border-[#00B0F4]/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
             <Snowflake className="h-5 w-5 text-[#00B0F4] shrink-0 mt-0.5" />
             <div className="space-y-0.5">
@@ -229,10 +256,19 @@ export const MemberDetail: React.FC<MemberDetailProps> = ({ memberId, onBack }) 
                 Membership Currently Frozen (On Hold)
               </h4>
               <p className="text-xs text-[#00B0F4]/80 leading-relaxed">
-                Reason: <strong>{member.frozen_reason || 'Temporary hold requested'}</strong>. Expiry alerts and past dues are paused. To unfreeze this athlete and start their fresh billing cycle, open the <strong>Freeze / Unfreeze</strong> tab.
+                Reason: <strong>{member.frozen_reason || 'Temporary hold requested'}</strong>. Expiry alerts and past dues are paused.
               </p>
             </div>
           </div>
+          <Button
+            variant="primary"
+            size="sm"
+            leftIcon={<Play className="h-3.5 w-3.5" />}
+            onClick={() => setIsUnfreezeOpen(true)}
+            className="bg-[#00B0F4] hover:bg-[#00B0F4]/90 text-white font-semibold shrink-0"
+          >
+            Unfreeze Member Now
+          </Button>
         </div>
       )}
 
@@ -296,25 +332,54 @@ export const MemberDetail: React.FC<MemberDetailProps> = ({ memberId, onBack }) 
                 {/* Financial Summary */}
                 <div className="bg-secondary/50 p-3 rounded-xl border border-border/80 space-y-1.5 pt-2">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Plan Fee:</span>
+                    <span className="text-muted-foreground">
+                      {member.timing_status === 'expired' ? 'Previous Cycle Fee:' : 'Plan Fee:'}
+                    </span>
                     <span className="font-medium text-foreground">
                       {currency} {member.current_membership.amount.toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Amount Paid:</span>
+                    <span className="text-muted-foreground">
+                      {member.timing_status === 'expired' ? 'Previous Fee Paid:' : 'Amount Paid:'}
+                    </span>
                     <span className="font-bold text-emerald-500">
                       {currency} {member.total_paid_for_current_membership.toLocaleString()}
                     </span>
                   </div>
+
+                  {member.timing_status === 'expired' && (member.past_cycle_due || 0) > 0 && (
+                    <div className="flex justify-between text-rose-400">
+                      <span>Previous Arrears Due:</span>
+                      <span className="font-semibold">{currency} {(member.past_cycle_due || 0).toLocaleString()}</span>
+                    </div>
+                  )}
+
+                  {member.timing_status === 'expired' && (
+                    <div className="flex justify-between text-amber-400">
+                      <span>Renewal Fee ({member.current_plan?.name || 'Current Plan'}):</span>
+                      <span className="font-semibold">
+                        {currency} {(member.renewal_fee_due || member.current_plan?.price || member.current_membership.amount).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+
                   <div className="flex justify-between border-t border-border/60 pt-1">
-                    <span className="text-muted-foreground font-semibold">Balance Due:</span>
+                    <span className="text-muted-foreground font-semibold">
+                      {member.status === 'frozen' ? 'Dues Status:' : 'Total Balance Due:'}
+                    </span>
                     <span
                       className={`font-bold ${
-                        member.balance_due > 0 ? 'text-rose-500' : 'text-emerald-500'
+                        member.status === 'frozen'
+                          ? 'text-[#00B0F4]'
+                          : member.balance_due > 0
+                          ? 'text-rose-500'
+                          : 'text-emerald-500'
                       }`}
                     >
-                      {currency} {member.balance_due.toLocaleString()}
+                      {member.status === 'frozen'
+                        ? 'Dues Paused'
+                        : `${currency} ${member.balance_due.toLocaleString()}`}
                     </span>
                   </div>
                 </div>
@@ -602,6 +667,19 @@ export const MemberDetail: React.FC<MemberDetailProps> = ({ memberId, onBack }) 
         member={member}
         isOpen={isRenewOpen}
         onClose={() => setIsRenewOpen(false)}
+        onSuccess={handleCreatedReceipt}
+      />
+
+      <FreezeMemberModal
+        member={member}
+        isOpen={isFreezeOpen}
+        onClose={() => setIsFreezeOpen(false)}
+      />
+
+      <UnfreezeMemberModal
+        member={member}
+        isOpen={isUnfreezeOpen}
+        onClose={() => setIsUnfreezeOpen(false)}
         onSuccess={handleCreatedReceipt}
       />
 

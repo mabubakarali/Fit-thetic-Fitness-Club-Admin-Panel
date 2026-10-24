@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { AddMemberModal } from '@/components/members/AddMemberModal';
 import { RecordPaymentModal } from '@/components/members/RecordPaymentModal';
 import { RenewMembershipModal } from '@/components/members/RenewMembershipModal';
+import { FreezeMemberModal } from '@/components/members/FreezeMemberModal';
 import { ImportMembersModal } from '@/components/members/ImportMembersModal';
 import { ReceiptModal } from '@/components/receipts/ReceiptModal';
 import { EnrichedMember, EnrichedReceipt, Receipt } from '@/types/database';
@@ -24,7 +25,8 @@ import {
   FileSpreadsheet,
   Receipt as ReceiptIcon,
   ChevronRight,
-  Send
+  Send,
+  Snowflake,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -53,6 +55,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [selectedMemberForRenew, setSelectedMemberForRenew] = useState<EnrichedMember | null>(null);
   const [selectedMemberForPay, setSelectedMemberForPay] = useState<EnrichedMember | null>(null);
+  const [selectedMemberForFreeze, setSelectedMemberForFreeze] = useState<EnrichedMember | null>(null);
   const [activeReceipt, setActiveReceipt] = useState<EnrichedReceipt | null>(null);
 
   const currency = settings.currency || 'Rs.';
@@ -234,17 +237,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
                 }}
                 className="bg-[#00B0F4] transition-all"
                 title="Frozen"
-              />
-              <div
-                style={{
-                  width: `${
-                    stats.allRegisteredMembers > 0
-                      ? (stats.unpaidCount / stats.allRegisteredMembers) * 100
-                      : 0
-                  }%`,
-                }}
-                className="bg-purple-500 transition-all"
-                title="Unpaid"
               />
             </div>
 
@@ -529,6 +521,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
                                 <Send className="h-3 w-3" /> WhatsApp
                               </a>
                               <Button
+                                variant="outline"
+                                size="xs"
+                                leftIcon={<Snowflake className="h-3 w-3 text-[#00B0F4]" />}
+                                onClick={() => setSelectedMemberForFreeze(member)}
+                                className="border-[#00B0F4]/40 text-[#00B0F4] hover:bg-[#00B0F4]/10 font-medium"
+                              >
+                                Freeze
+                              </Button>
+                              <Button
                                 variant="primary"
                                 size="xs"
                                 onClick={() => setSelectedMemberForRenew(member)}
@@ -593,16 +594,38 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              variant="primary"
-                              size="xs"
-                              onClick={() => {
-                                const em = enrichedMembers.find((m) => m.id === item.member.id);
-                                if (em) setSelectedMemberForPay(em);
-                              }}
-                            >
-                              Record Payment
-                            </Button>
+                            <div className="flex items-center justify-end gap-2">
+                              <a
+                                href={getWhatsAppShareUrl(item.member.id)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 font-medium transition-colors border border-emerald-500/20 cursor-pointer"
+                              >
+                                <Send className="h-3 w-3" /> WhatsApp
+                              </a>
+                              <Button
+                                variant="outline"
+                                size="xs"
+                                leftIcon={<Snowflake className="h-3 w-3 text-[#00B0F4]" />}
+                                onClick={() => {
+                                  const em = enrichedMembers.find((m) => m.id === item.member.id);
+                                  if (em) setSelectedMemberForFreeze(em);
+                                }}
+                                className="border-[#00B0F4]/40 text-[#00B0F4] hover:bg-[#00B0F4]/10 font-medium"
+                              >
+                                Freeze
+                              </Button>
+                              <Button
+                                variant="primary"
+                                size="xs"
+                                onClick={() => {
+                                  const em = enrichedMembers.find((m) => m.id === item.member.id);
+                                  if (em) setSelectedMemberForPay(em);
+                                }}
+                              >
+                                Record Payment
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -748,6 +771,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
         isOpen={Boolean(selectedMemberForRenew)}
         onClose={() => setSelectedMemberForRenew(null)}
         onSuccess={handleCreatedReceipt}
+      />
+
+      <FreezeMemberModal
+        member={selectedMemberForFreeze}
+        isOpen={Boolean(selectedMemberForFreeze)}
+        onClose={() => setSelectedMemberForFreeze(null)}
       />
 
       <ImportMembersModal

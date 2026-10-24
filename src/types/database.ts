@@ -190,6 +190,8 @@ export interface EnrichedMember extends Member {
   days_remaining: number;
   total_paid_for_current_membership: number;
   balance_due: number;
+  past_cycle_due?: number;
+  renewal_fee_due?: number;
   is_unpaid: boolean;
   last_payment_date?: string;
   all_memberships: Membership[];

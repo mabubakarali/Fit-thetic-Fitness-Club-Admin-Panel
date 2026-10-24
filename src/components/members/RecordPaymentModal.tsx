@@ -95,7 +95,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
       // Determine initial mode & amount
       if (initialMode === 'extend' || currentMember.timing_status === 'expired') {
         setPaymentMode('extend');
-        setAmount(planToUse?.price || 2500);
+        setAmount(currentMember.balance_due > 0 ? currentMember.balance_due : (planToUse?.price || 2500));
       } else if (currentMember.is_unpaid && currentMember.balance_due > 0) {
         setPaymentMode('pay_due');
         setAmount(currentMember.balance_due);
@@ -400,7 +400,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                 <span className="text-[#949BA4] block text-[10px] uppercase font-bold">Status</span>
                 <span className={`font-bold ${isMemberExpired ? 'text-[#DA373C]' : currentMember.is_unpaid ? 'text-[#F0B232]' : 'text-[#23A55A]'}`}>
                   {isMemberExpired
-                    ? 'Expired'
+                    ? `Expired (Due: ${currency} ${currentMember.balance_due.toLocaleString()})`
                     : currentMember.is_unpaid
                     ? `Due: ${currency} ${currentMember.balance_due.toLocaleString()}`
                     : 'Paid Active'}

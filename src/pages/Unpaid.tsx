@@ -140,7 +140,7 @@ export const Unpaid: React.FC<UnpaidProps> = ({ onSelectMemberDetail }) => {
 
                 <TableCell className="text-xs">
                   <span className="font-medium text-foreground">{item.plan.name}</span>
-                  <p className="text-muted-foreground">Total: {currency} {item.membership.amount.toLocaleString()}</p>
+                  <p className="text-muted-foreground">Fee: {currency} {item.plan.price.toLocaleString()}</p>
                 </TableCell>
 
                 <TableCell className="font-bold text-rose-500 text-sm">

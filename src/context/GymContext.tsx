@@ -378,12 +378,16 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let days_remaining = 0;
       let total_paid_for_current_membership = 0;
       let balance_due = 0;
+      let past_cycle_due = 0;
+      let renewal_fee_due = 0;
       let is_unpaid = false;
 
       if (member.status === 'frozen') {
         timing_status = 'frozen';
         is_unpaid = false;
         balance_due = 0;
+        past_cycle_due = 0;
+        renewal_fee_due = 0;
         days_remaining = 0;
         if (currentMembership) {
           const paymentsForCurrent = payments.filter(
@@ -407,10 +411,21 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           (p) => p.membership_id === currentMembership.id && !p.deleted_at
         );
         total_paid_for_current_membership = paymentsForCurrent.reduce((acc, p) => acc + p.amount, 0);
-        balance_due = Math.max(0, currentMembership.amount - total_paid_for_current_membership);
-        is_unpaid = balance_due > 0;
+        past_cycle_due = Math.max(0, currentMembership.amount - total_paid_for_current_membership);
+
+        if (timing_status === 'expired') {
+          renewal_fee_due = currentPlan ? currentPlan.price : currentMembership.amount;
+          balance_due = past_cycle_due + renewal_fee_due;
+          is_unpaid = true;
+        } else {
+          renewal_fee_due = 0;
+          balance_due = past_cycle_due;
+          is_unpaid = balance_due > 0;
+        }
       } else {
         timing_status = 'expired';
+        renewal_fee_due = currentPlan ? currentPlan.price : 2500;
+        balance_due = renewal_fee_due;
         is_unpaid = true;
       }
 
@@ -426,6 +441,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         days_remaining,
         total_paid_for_current_membership,
         balance_due,
+        past_cycle_due,
+        renewal_fee_due,
         is_unpaid,
         last_payment_date: lastPayment ? lastPayment.payment_date : undefined,
         all_memberships: memberMemberships,
@@ -440,25 +457,42 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const details: UnpaidMemberDetail[] = [];
 
     enrichedMembers.forEach((em) => {
-      if (em.status !== 'frozen' && em.is_unpaid && em.current_membership && em.current_plan) {
-        const dueDate = em.current_membership.start_date;
+      if (em.status !== 'frozen' && em.is_unpaid) {
+        const plan = em.current_plan || plans[0];
+        const dueDate = em.current_membership
+          ? (em.timing_status === 'expired' ? em.current_membership.end_date : em.current_membership.start_date)
+          : em.created_at
+          ? format(new Date(em.created_at), 'yyyy-MM-dd')
+          : format(today, 'yyyy-MM-dd');
         const daysOverdue = Math.max(0, differenceInDays(today, new Date(dueDate)));
 
-        details.push({
-          member: em,
-          membership: em.current_membership,
-          plan: em.current_plan,
-          amount_due: em.balance_due,
-          due_date: dueDate,
-          days_overdue: daysOverdue,
-          total_paid: em.total_paid_for_current_membership,
-          last_payment_date: em.last_payment_date,
-        });
+        if (plan) {
+          details.push({
+            member: em,
+            membership: em.current_membership || {
+              id: `unassigned-${em.id}`,
+              member_id: em.id,
+              plan_id: plan.id,
+              start_date: dueDate,
+              end_date: dueDate,
+              amount: em.balance_due,
+              status: 'active',
+              created_at: em.created_at,
+              updated_at: em.created_at,
+            },
+            plan,
+            amount_due: em.balance_due,
+            due_date: dueDate,
+            days_overdue: daysOverdue,
+            total_paid: em.total_paid_for_current_membership,
+            last_payment_date: em.last_payment_date,
+          });
+        }
       }
     });
 
     return details.sort((a, b) => b.days_overdue - a.days_overdue);
-  }, [enrichedMembers]);
+  }, [enrichedMembers, plans]);
 
   const expiringMembers: ExpiringMemberDetail[] = useMemo(() => {
     const details: ExpiringMemberDetail[] = [];
@@ -1438,8 +1472,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const enriched = enrichedMembers.find((m) => m.id === memberId);
     const planName = enriched?.current_plan?.name || 'Membership Plan';
-    const planPrice = enriched?.current_plan?.price || (membership?.amount || 3000);
-    const pastDue = enriched?.balance_due || 0;
+    const planPrice = enriched?.renewal_fee_due || enriched?.current_plan?.price || (membership?.amount || 3000);
+    const pastDue = enriched?.past_cycle_due || 0;
     const totalWithRenewal = pastDue + planPrice;
 
     let message = '';
@@ -1508,8 +1542,8 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const enriched = enrichedMembers.find((m) => m.id === memberId);
     const planName = enriched?.current_plan?.name || 'Membership Plan';
-    const planPrice = enriched?.current_plan?.price || (membership?.amount || 3000);
-    const pastDue = enriched?.balance_due || 0;
+    const planPrice = enriched?.renewal_fee_due || enriched?.current_plan?.price || (membership?.amount || 3000);
+    const pastDue = enriched?.past_cycle_due || 0;
     const totalWithRenewal = pastDue + planPrice;
 
     let message = '';
