@@ -94,6 +94,11 @@ export const FreezeUnfreeze: React.FC<FreezeUnfreezeProps> = ({
       }
 
       return true;
+    }).sort((a, b) => {
+      if (statusFilter === 'expired') {
+        return b.days_remaining - a.days_remaining;
+      }
+      return 0;
     });
   }, [enrichedMembers, statusFilter, planFilter, searchQuery]);
 

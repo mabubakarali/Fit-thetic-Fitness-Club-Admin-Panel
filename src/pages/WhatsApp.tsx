@@ -32,15 +32,29 @@ export const WhatsApp: React.FC = () => {
 
   const [selectedReminderForPreview, setSelectedReminderForPreview] = useState<WhatsAppReminder | null>(null);
 
-  // All members who are expired or expiring soon (within 7 days)
+  // All members who are expired or expiring soon (within 7 days), with recently expired on top
   const actionableMembers = enrichedMembers
     .filter(
       (m) =>
         m.status !== 'inactive' &&
+        m.status !== 'frozen' &&
         m.current_membership &&
         (m.timing_status === 'expired' || m.timing_status === 'expiring_soon' || m.days_remaining <= 7)
     )
-    .sort((a, b) => a.days_remaining - b.days_remaining);
+    .sort((a, b) => {
+      // If both are expired (days_remaining < 0):
+      // Most recently expired on top (e.g. -1d before -8d before -54d)
+      if (a.days_remaining < 0 && b.days_remaining < 0) {
+        return b.days_remaining - a.days_remaining;
+      }
+      // If both are expiring soon (days_remaining >= 0):
+      // Soonest to expire on top (e.g. 0d, 1d, 2d, 7d)
+      if (a.days_remaining >= 0 && b.days_remaining >= 0) {
+        return a.days_remaining - b.days_remaining;
+      }
+      // Expired members on top so immediate overdue action can be taken
+      return a.days_remaining < 0 ? -1 : 1;
+    });
 
   const handleSendReminder = async (
     memberId: string,

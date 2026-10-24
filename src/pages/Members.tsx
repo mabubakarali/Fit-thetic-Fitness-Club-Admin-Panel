@@ -129,6 +129,12 @@ export const Members: React.FC<MembersProps> = ({
         return true;
       })
       .sort((a, b) => {
+        if (statusFilter === 'expired' && sortBy === 'newest') {
+          return b.days_remaining - a.days_remaining;
+        }
+        if (statusFilter === 'unpaid' && sortBy === 'newest') {
+          return b.days_remaining - a.days_remaining;
+        }
         if (sortBy === 'newest') {
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         }
@@ -139,7 +145,13 @@ export const Members: React.FC<MembersProps> = ({
           return a.full_name.localeCompare(b.full_name);
         }
         if (sortBy === 'days_left') {
-          return a.days_remaining - b.days_remaining;
+          if (a.days_remaining < 0 && b.days_remaining < 0) {
+            return b.days_remaining - a.days_remaining;
+          }
+          if (a.days_remaining >= 0 && b.days_remaining >= 0) {
+            return a.days_remaining - b.days_remaining;
+          }
+          return a.days_remaining >= 0 ? -1 : 1;
         }
         if (sortBy === 'balance_due') {
           return b.balance_due - a.balance_due;

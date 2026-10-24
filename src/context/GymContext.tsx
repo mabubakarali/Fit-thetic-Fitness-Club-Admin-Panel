@@ -491,7 +491,7 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
 
-    return details.sort((a, b) => b.days_overdue - a.days_overdue);
+    return details.sort((a, b) => a.days_overdue - b.days_overdue);
   }, [enrichedMembers, plans]);
 
   const expiringMembers: ExpiringMemberDetail[] = useMemo(() => {
@@ -527,7 +527,9 @@ export const GymProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [enrichedMembers, reminders]);
 
   const expiredMembers: EnrichedMember[] = useMemo(() => {
-    return enrichedMembers.filter((m) => m.timing_status === 'expired' && m.status !== 'frozen');
+    return enrichedMembers
+      .filter((m) => m.timing_status === 'expired' && m.status !== 'frozen')
+      .sort((a, b) => b.days_remaining - a.days_remaining);
   }, [enrichedMembers]);
 
   const frozenMembers: EnrichedMember[] = useMemo(() => {

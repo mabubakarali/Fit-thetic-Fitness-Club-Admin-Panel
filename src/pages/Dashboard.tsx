@@ -98,7 +98,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab, onSelectMem
           m.current_membership &&
           m.days_remaining < 0
       )
-      .sort((a, b) => a.days_remaining - b.days_remaining);
+      .sort((a, b) => b.days_remaining - a.days_remaining);
   }, [enrichedMembers]);
 
   return (
